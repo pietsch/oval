@@ -1,6 +1,6 @@
 <?xml version = "1.0" encoding = "UTF-8"?> 
 
-<!-- Combined schemas for OAI-PMH and oai_dc-->
+<!-- Combined XML schemas-->
 
 <xs:schema xmlns="http://dummy.libxml2.validator" 
     targetNamespace="http://dummy.libxml2.validator" 
@@ -13,5 +13,7 @@
     
     <xs:import namespace="http://www.openarchives.org/OAI/2.0/" schemaLocation="http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd"/> 
     <xs:import namespace="http://www.openarchives.org/OAI/2.0/oai_dc/" schemaLocation="http://www.openarchives.org/OAI/2.0/oai_dc.xsd"/> 
+    <xs:import namespace="http://www.openarchives.org/OAI/2.0/oai-identifier" schemaLocation="http://www.openarchives.org/OAI/2.0/oai-identifier.xsd"/> 
+
 
 </xs:schema>

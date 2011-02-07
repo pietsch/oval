@@ -1,0 +1,19 @@
+.. -*- restructuredtext -*-
+
+===============
+README for ovid
+===============
+
+Dependencies
+============
+
+* lxml
+
+
+Installing
+==========
+
+Use ``setup.py``::
+
+   python setup.py build
+   sudo python setup.py install

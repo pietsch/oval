@@ -12,12 +12,8 @@ import urllib2
 from urllib import urlencode
 
 def request_oai(base_url, verb, **kw):
-    """Perform request to base_url with verb and kw args"""
+    """Perform request to base_url with verb and kw args. Return file like."""
     params = kw
     params['verb'] = verb
-    if verb == 'ListRecords':
-        url = base_url + urlencode(params)
-        return urllib2.urlopen(url)
-    if verb == 'Identify':
-        url = base_url + urlencode(params)
-        return urllib2.urlopen(url)
+    url = base_url + urlencode(params)
+    return urllib2.urlopen(url)
