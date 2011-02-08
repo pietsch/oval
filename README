@@ -8,7 +8,7 @@ Dependencies
 ============
 
 * lxml
-
+* bottle.py
 
 Installing
 ==========

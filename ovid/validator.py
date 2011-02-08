@@ -12,6 +12,7 @@ import sys
 import os
 
 import urllib2
+from urllib2 import URLError
 from lxml import etree
 from lxml.etree import XMLSyntaxError
 from lxml.etree import DocumentInvalid
@@ -20,46 +21,53 @@ from harvester import request_oai
 from ovid import DATA_PATH
 
 class Validator(object):
-    """Knows how to validate OAI-OMH interfaces"""
+    """Validate OAI-OMH interfaces"""
     def __init__(self, base_url):
         super(Validator, self).__init__()
-        self.base_url = base_url
+        if base_url.endswith('?'):
+            self.base_url = base_url
+        else:
+            self.base_url = base_url + '?'
 
     def interface_reachable(self):
         """Check if the OAI-PMH interface is working"""
         try:
-            urllib2.urlopen(self.base_url)
-            return True
+            res = urllib2.urlopen(self.base_url)
+            return res.code
+        except URLError, m:
+            return str(m)
+        except ValueError, m:
+            return str(m)
         except urllib2.HTTPError, e:
             return e.code
     
     
     def check_XML(self, verb):
-        """Check if XML response of OAI-PMH verb is well-formed"""
+        """Check if XML response for OAI-PMH verb is well-formed"""
         if verb == 'Identify':
             try:
                 remote = request_oai(self.base_url, verb)
                 etree.parse(remote)
                 return True
             except XMLSyntaxError, message:
-                return m
+                return message
         elif verb == 'ListRecords':
             try:
                 remote = request_oai(self.base_url, verb, metadataPrefix='oai_dc')
                 etree.parse(remote)
                 return True
             except XMLSyntaxError, message:
-                return m
+                return message
             
             
     def validate_XML(self, verb):
-        """Check if XML of OAI-PMH verb is valid"""        
+        """Check if XML returned for OAI-PMH verb is valid"""
         if verb == 'Identify':
             try:
                 remote = request_oai(self.base_url, verb)
                 tree = etree.parse(remote)
-            except XMLSyntaxError, m:
-                return m
+            except XMLSyntaxError, message:
+                return message
 
         elif verb == 'ListRecords':
             try:
@@ -75,6 +83,6 @@ class Validator(object):
             return True
         except DocumentInvalid, message:
             return message
-            
-        
+
+
         
