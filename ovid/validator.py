@@ -8,7 +8,6 @@
     :copyright: Copyright 2011 Mathias Loesch.
 """
 
-import sys
 import os
 
 import random
@@ -28,6 +27,12 @@ OAI = '{%s}' % OAI_NAMESPACE
 DC_NAMESPACE = "http://purl.org/dc/elements/1.1/"
 DC = '{%s}' % DC_NAMESPACE
 
+MINIMAL_DC_SET = set([
+                'identifier',
+                'title',
+                'date',
+                'type',
+                'creator'])
 
 class Validator(object):
     """Validate OAI-OMH interfaces."""
@@ -64,7 +69,8 @@ class Validator(object):
                 return message
         elif verb == 'ListRecords':
             try:
-                remote = request_oai(self.base_url, verb, metadataPrefix=metadataPrefix)
+                remote = request_oai(self.base_url, verb, 
+                                        metadataPrefix=metadataPrefix)
                 etree.parse(remote)
                 return True
             except XMLSyntaxError, message:
@@ -81,7 +87,8 @@ class Validator(object):
                 return message
         elif verb == 'ListRecords':
             try:
-                remote = request_oai(self.base_url, verb, metadataPrefix=metadataPrefix)
+                remote = request_oai(self.base_url, verb, 
+                                        metadataPrefix=metadataPrefix)
                 tree = etree.parse(remote)
             except XMLSyntaxError, m:
                 return m
@@ -95,7 +102,8 @@ class Validator(object):
             return message
 
 
-    def reasonable_batch_size(self, verb, metadataPrefix='oai_dc', min_batch_size=100, max_batch_size=500):
+    def reasonable_batch_size(self, verb, metadataPrefix='oai_dc', 
+                            min_batch_size=100, max_batch_size=500):
         """
         Check if a reasonable number of data records is returned for a
         ListRecords/ListIdentifiers request. Return a tuple of
@@ -120,8 +128,11 @@ class Validator(object):
 
 
     def incremental_harvesting(self, metadataPrefix='oai_dc'):
-        """Check if server supports incremental harvesting by date (returns Boolean)."""
-        remote = request_oai(self.base_url, 'ListRecords', metadataPrefix=metadataPrefix)
+        """
+        Check if server supports incremental harvesting by date (returns Boolean).
+        """
+        remote = request_oai(self.base_url, 'ListRecords', 
+                            metadataPrefix=metadataPrefix)
         tree = etree.parse(remote)
         records = tree.findall('.//' + OAI + 'record')
         reference_record = random.sample(records, 1)[0]
@@ -129,7 +140,8 @@ class Validator(object):
         reference_oai_id = reference_record.find('.//' + OAI + 'identifier').text
         
         remote = request_oai(self.base_url, 'ListRecords', 
-                            metadataPrefix=metadataPrefix, _from=reference_datestamp,
+                            metadataPrefix=metadataPrefix, 
+                            _from=reference_datestamp,
                             until=reference_datestamp)
         tree = etree.parse(remote)                    
         records = tree.findall('.//' + OAI + 'record')
@@ -141,5 +153,15 @@ class Validator(object):
             return True
         else:
             return False
-            
     
+    def minimal_dc_elements(self):
+        """Check for the minimal set of Dublin Core elements."""
+        pass
+    
+    def check_resumption_token(self):
+        """Make sure that the resumption token works"""
+        pass
+        
+    def dc_date_ISO(self):
+        """Check if dc:date matches YYYY-MM-DD"""
+        pass
