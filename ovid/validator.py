@@ -13,6 +13,7 @@ import os
 import random
 import urllib2
 from urllib2 import URLError, HTTPError
+import re
 
 from lxml import etree
 from lxml.etree import XMLSyntaxError
@@ -27,6 +28,7 @@ OAI = '{%s}' % OAI_NAMESPACE
 DC_NAMESPACE = "http://purl.org/dc/elements/1.1/"
 DC = '{%s}' % DC_NAMESPACE
 
+# Minimal Dublin Core elements according to DRIVER and DINI
 MINIMAL_DC_SET = set([
                 'identifier',
                 'title',
@@ -34,8 +36,22 @@ MINIMAL_DC_SET = set([
                 'type',
                 'creator'])
 
+# Date scheme according to ISO 8601
+DC_DATE_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+
+# Helper functions
+
+def get_records(base_url, metadataPrefix='oai_dc'):
+    """
+    Helper function for getting records. Returns a list of etree elements.
+    """
+    remote = request_oai(base_url, 'ListRecords', metadataPrefix=metadataPrefix)
+    tree = etree.parse(remote)
+    records = tree.findall('.//' + OAI + 'record')
+    return records
+
 class Validator(object):
-    """Validate OAI-OMH interfaces."""
+    """Validates OAI-OMH interfaces."""
 
     def __init__(self, base_url):
         super(Validator, self).__init__()
@@ -44,20 +60,14 @@ class Validator(object):
         else:
             self.base_url = base_url + '?'
 
-
-    def interface_reachable(self):
-        """Check if the OAI-PMH interface is working."""
-        try:
-            res = urllib2.urlopen(self.base_url)
-            return res.code
-        except URLError, m:
-            return str(m)
-        except ValueError, m:
-            return str(m)
-        except HTTPError, e:
-            return e.code
-
-
+        try: 
+            urllib2.urlopen(self.base_url)
+            self.interface_reachable = True
+            self.network_error = None
+        except Exception, message:
+            self.interface_reachable = False
+            self.network_error = message
+        
     def check_XML(self, verb, metadataPrefix='oai_dc'):
         """Check if XML response for OAI-PMH verb is well-formed."""
         if verb == 'Identify':
@@ -115,9 +125,7 @@ class Validator(object):
             element = 'record'
         if verb == 'ListIdentifiers':
             element = 'header'
-        remote = request_oai(self.base_url, verb, metadataPrefix=metadataPrefix)
-        tree = etree.parse(remote)
-        records = tree.findall('.//' + OAI + element)
+        records = get_records(self.base_url, metadataPrefix=metadataPrefix)
         batch_size = len(records)
         if batch_size < min_batch_size:
             return (-1, batch_size, min_batch_size)
@@ -127,24 +135,29 @@ class Validator(object):
             return (0, batch_size)
 
 
-    def incremental_harvesting(self, metadataPrefix='oai_dc'):
+    def incremental_harvesting(self, verb, metadataPrefix='oai_dc'):
         """
         Check if server supports incremental harvesting by date (returns Boolean).
         """
-        remote = request_oai(self.base_url, 'ListRecords', 
-                            metadataPrefix=metadataPrefix)
+        if verb == 'ListRecords':
+            element = 'record'
+        if verb == 'ListIdentifiers':
+            element = 'header'
+        
+        remote = request_oai(self.base_url, verb, metadataPrefix=metadataPrefix)
         tree = etree.parse(remote)
-        records = tree.findall('.//' + OAI + 'record')
+        records = tree.findall('.//' + OAI + element)
+        
         reference_record = random.sample(records, 1)[0]
         reference_datestamp = reference_record.find('.//' + OAI + 'datestamp').text
         reference_oai_id = reference_record.find('.//' + OAI + 'identifier').text
         
-        remote = request_oai(self.base_url, 'ListRecords', 
+        remote = request_oai(self.base_url, verb, 
                             metadataPrefix=metadataPrefix, 
                             _from=reference_datestamp,
                             until=reference_datestamp)
         tree = etree.parse(remote)                    
-        records = tree.findall('.//' + OAI + 'record')
+        records = tree.findall('.//' + OAI + element)
         if len(records) > 1:
             return False
         test_record = records[0]
@@ -155,13 +168,43 @@ class Validator(object):
             return False
     
     def minimal_dc_elements(self):
-        """Check for the minimal set of Dublin Core elements."""
+        """
+        Check for the minimal set of Dublin Core elements. Return True if OK
+        or a dictionary of record IDs and missing elements if not.
+        """
+        err_dict = {}
+        records = get_records(self.base_url)
+        for record in records:
+            oai_id = record.find('.//' + OAI + 'identifier').text
+            dc_elements = record.findall('.//' + DC + '*')
+            dc_tags = set([dc.tag[34:] for dc in dc_elements])
+            if MINIMAL_DC_SET - dc_tags != set():
+                err_dict[oai_id] = MINIMAL_DC_SET - dc_tags
+        if err_dict == {}:
+            return True 
+        else:
+            return err_dict
+    
+    
+    def dc_date_ISO(self):
+        """
+        Check if dc:date conforms to ISO 8601 (matches YYYY-MM-DD).
+        Return True if OK or a dictionary of record IDs and invalid dates if not.
+        """
+        err_dict = {}
+        records = get_records(self.base_url)
+        for record in records:
+            oai_id = record.find('.//' + OAI + 'identifier').text
+            dc_dates = record.findall('.//' + DC + 'date')
+            for dc_date in dc_dates:
+                if not re.match(DC_DATE_PATTERN, dc_date.text):
+                    err_dict[oai_id] = dc_date.text
+        if err_dict == {}:
+            return True
+        else:
+            return err_dict
+            
+    def check_resumption_token(self, verb, metadataPrefix):
+        """Make sure that the resumption token works."""
         pass
     
-    def check_resumption_token(self):
-        """Make sure that the resumption token works"""
-        pass
-        
-    def dc_date_ISO(self):
-        """Check if dc:date matches YYYY-MM-DD"""
-        pass
