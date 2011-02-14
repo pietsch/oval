@@ -21,6 +21,8 @@ from lxml.etree import DocumentInvalid
 
 from ovid.harvester import request_oai
 from ovid import DATA_PATH
+from ovid import ISO_639_3_CODES, ISO_639_2B_CODES
+from ovid import ISO_639_2T_CODES, ISO_639_1_CODES
 
 OAI_NAMESPACE = "http://www.openarchives.org/OAI/2.0/"
 OAI = '{%s}' % OAI_NAMESPACE
@@ -39,11 +41,18 @@ MINIMAL_DC_SET = set([
 # Date scheme according to ISO 8601
 DC_DATE_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 
-# Helper functions
+class ISOLanguageError(Exception):
+    def __init__(self, invalid_language):
+        self.invalid_language = invalid_language
+    
+    def __str__(self):
+        return "Invalid language: %s" % self.invalid_language
 
+
+# Helper functions
 def get_records(base_url, metadataPrefix='oai_dc'):
     """
-    Helper function for getting records. Returns a list of etree elements.
+    Shortcut for getting records in oai_dc. Returns a list of etree elements.
     """
     remote = request_oai(base_url, 'ListRecords', metadataPrefix=metadataPrefix)
     tree = etree.parse(remote)
@@ -59,15 +68,11 @@ class Validator(object):
             self.base_url = base_url
         else:
             self.base_url = base_url + '?'
-
         try: 
             urllib2.urlopen(self.base_url)
-            self.interface_reachable = True
-            self.network_error = None
-        except Exception, message:
-            self.interface_reachable = False
-            self.network_error = message
-        
+        except Exception:
+            raise
+    
     def check_XML(self, verb, metadataPrefix='oai_dc'):
         """Check if XML response for OAI-PMH verb is well-formed."""
         if verb == 'Identify':
@@ -203,8 +208,32 @@ class Validator(object):
             return True
         else:
             return err_dict
-            
-    def check_resumption_token(self, verb, metadataPrefix):
-        """Make sure that the resumption token works."""
+    
+    def dc_language_ISO(self):
+        """Check if dc:language conforms to ISO 639-3/-2B/-2T/-1."""
+        records = get_records(self.base_url)
+        test_record = random.sample(records, 1)[0]
+        oai_id = test_record.find('.//' + OAI + 'identifier').text
+        language_elements = test_record.findall('.//' + DC + 'language')
+        
+        for language_element in language_elements:
+            language = language_element.text
+            if language in ISO_639_3_CODES:
+                return (oai_id, language, '639_3')
+            elif language in ISO_639_2B_CODES:
+                return (oai_id, language, '639_2B')
+            elif language in ISO_639_2T_CODES:
+                return (oai_id, language, '639_2T')
+            elif language in ISO_639_1_CODES:
+                return (oai_id, language, '639_1')
+            else:
+                raise ISOLanguageError(language)
+
+
+    def check_resumption_token(self, verb, metadataPrefix, batches=1):
+        """
+        Make sure that the resumption token works. Check as many batches 
+        as specified (default: 1).
+        """
         pass
     

@@ -8,9 +8,9 @@ from distutils import log
 import ovid
 
 long_desc = '''
-ovid (OAI ValIDator) is a validator for OAI-PMH interfaces. It checks XML validity as
-well as conformance of OAI-PMH interface to the protocol specification
-(http://www.openarchives.org/OAI/openarchivesprotocol.html).
+ovid (OAI ValIDator) is a validator for OAI-PMH interfaces. It checks XML 
+validity as well as conformance of OAI-PMH interface to the protocol 
+specification (http://www.openarchives.org/OAI/openarchivesprotocol.html).
 '''
 
 setup(
@@ -24,14 +24,14 @@ setup(
     long_description=long_desc,
     zip_safe=False,
     classifiers=[
-        'Intended Audience :: Developers',
         'License :: OSI Approved :: BSD License',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
         'Intended Audience :: Science/Research',
+        'Intended Audience :: Developers'
     ],
     platforms='any',
     packages=find_packages(),
     include_package_data=True,
-    package_data={'ovid': ['data/*.xsd', 'data/*.html']}    
+    package_data={'ovid': ['data/*.xsd', 'data/*.html', 'data/*.tab']}
 )

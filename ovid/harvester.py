@@ -9,7 +9,7 @@
 """
 
 import urllib2 
-from urllib2 import HTTPError
+from urllib2 import HTTPError, URLError
 from urllib import urlencode
 from time import sleep
 
@@ -36,10 +36,12 @@ def request_oai(base_url, verb, retries=5,**kw):
                     wait_time = int(e.hdrs.get('Retry-After'))
                 except TypeError:
                     wait_time = None
-                if wait_time is None:
+                if wait_time == None:
                     sleep(100)
                 else:
                     sleep(wait_time)
             else:
                 raise
+        except Exception:
+            raise
     
