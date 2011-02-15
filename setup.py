@@ -5,16 +5,16 @@ import sys
 from setuptools import setup, find_packages
 from distutils import log
 
-import ovid
+import oval
 
 long_desc = '''
-ovid (OAI ValIDator) is a validator for OAI-PMH interfaces. It checks XML 
+oval (OAI VALidator) is a validator for OAI-PMH interfaces. It checks XML 
 validity as well as conformance of OAI-PMH interface to the protocol 
 specification (http://www.openarchives.org/OAI/openarchivesprotocol.html).
 '''
 
 setup(
-    name='ovid',
+    name='oval',
     version=ovid.__version__,
     url='http://www.ub.uni-bielefeld.de/',
     license='BSD',
@@ -33,5 +33,5 @@ setup(
     platforms='any',
     packages=find_packages(),
     include_package_data=True,
-    package_data={'ovid': ['data/*.xsd', 'data/*.html', 'data/*.tab']}
+    package_data={'oval': ['data/*.xsd', 'data/*.html', 'data/*.tab']}
 )
