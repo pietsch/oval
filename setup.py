@@ -15,7 +15,7 @@ specification (http://www.openarchives.org/OAI/openarchivesprotocol.html).
 
 setup(
     name='oval',
-    version=ovid.__version__,
+    version=oval.__version__,
     url='http://www.ub.uni-bielefeld.de/',
     license='BSD',
     author='Mathias Loesch',
