@@ -89,13 +89,16 @@ class Validator(object):
                 remote = request_oai(self.base_url, verb, 
                                     metadataPrefix=metadataPrefix)
         except Exception, exc:
-            self.results.append(('%sWellFormed' % verb, 'unverified', exc.args[0]))
+            message = "Well-formedness of %s could not be checked. Reason: %s" % (verb,
+                                                                        exc.args[0])
+            self.results.append(('%sWellFormed' % verb, 'unverified', message))
             return
         try:        
             etree.parse(remote)
-            self.results.append(('%sWellFormed' % verb, 'ok', '%s response is well-formed' % verb))
+            self.results.append(('%sWellFormed' % verb, 'ok', '%s response is well-formed.' % verb))
         except XMLSyntaxError, exc:
-            self.results.append(('%sWellFormed' % verb, 'error', exc.args[0]))
+            message = '%s response is not well-formed: %s' % (verb, exc.args[0])
+            self.results.append(('%sWellFormed' % verb, 'error', message))
 
 
     def validate_XML(self, verb, metadataPrefix='oai_dc'):
@@ -107,13 +110,11 @@ class Validator(object):
             elif verb == 'ListRecords':
                 remote = request_oai(self.base_url, verb, 
                                         metadataPrefix=metadataPrefix)
-        except Exception, exc:
-            self.results.append(('%sValid' % verb, 'unverified', exc.args[0]))
-            return
-        try:
             tree = etree.parse(remote)
-        except XMLSyntaxError:
-            self.results.append(('%sValid' % verb, 'error', exc.args[0]))
+        except Exception, exc:
+            message = 'Validity of %s could not be checked. Reason: %s' % (verb,
+                                                                    exc.args[0])
+            self.results.append(('%sValid' % verb, 'unverified', message))
             return
         schema_file = os.path.join(DATA_PATH, 'combined.xsd')
         schema_tree = etree.parse(schema_file)
@@ -122,7 +123,8 @@ class Validator(object):
             schema.assertValid(tree)
             self.results.append(('%sValid' % verb, 'ok', '%s response is valid.' % verb))
         except DocumentInvalid, exc:
-            self.results.append(('%sValid' % verb, 'error', exc.args[0]))
+            message = "%s response is invalid. %s" % (verb, exc.args[0])
+            self.results.append(('%sValid' % verb, 'error', message))
 
     def reasonable_batch_size(self, verb, metadataPrefix='oai_dc', 
                             min_batch_size=100, max_batch_size=500):
@@ -140,18 +142,19 @@ class Validator(object):
                                 metadataPrefix=metadataPrefix)
             tree = etree.parse(remote)
         except Exception, exc:
-            self.results.append(('%sBatch' % verb, 'unverified', exc.args[0]))
+            message = "%s batch size could not be checked: %s" % (verb, exc.args[0])
+            self.results.append(('%sBatch' % verb, 'unverified', message))
             return
         
         records = tree.findall('.//' + OAI + element)        
         batch_size = len(records)
         if batch_size < min_batch_size:
-            message = '%s batch too small (%d), should be at least %d.' % \
+            message = '%s batch size too small (%d), should be at least %d.' % \
                        (verb, batch_size, min_batch_size)
             self.results.append(('%sBatch' % verb, 'recommendation', message))
         elif batch_size > max_batch_size:
-            message = '%s batch too large (%d), should be at most %d.' % \
-                       (verb, batch_size, min_batch_size)
+            message = '%s batch size is too large (%d), should be at most %d.' % \
+                       (verb, batch_size, max_batch_size)
             self.results.append(('%sBatch' % verb, 'recommendation', message))
         else:
             message = '%s batch size is OK (%d).' % (verb, batch_size)
@@ -166,10 +169,13 @@ class Validator(object):
         if verb == 'ListIdentifiers':
             element = 'header'
         try:
-            remote = request_oai(self.base_url, verb, metadataPrefix=metadataPrefix)
+            remote = request_oai(self.base_url, verb, 
+                                metadataPrefix=metadataPrefix)
             tree = etree.parse(remote)
         except Exception, exc:
-            self.results.append(('Incremental%s' % verb, 'unverified', exc.args[0]))
+            message = "Incremental harvesting could not be checked: %s" % exc.args[0]
+            self.results.append(('Incremental%s' % verb, 'unverified', 
+                                message))
             return
         records = tree.findall('.//' + OAI + element)
         
@@ -184,13 +190,16 @@ class Validator(object):
         tree = etree.parse(remote)                    
         records = tree.findall('.//' + OAI + element)
         if len(records) > 1:
-            self.results.append(('Incremental%s' % verb, 'error', 'No incremental harvesting.'))
+            self.results.append(('Incremental%s' % verb, 'error', 
+                                'No incremental harvesting.'))
         test_record = records[0]
         test_oai_id = test_record.find('.//' + OAI + 'identifier').text
         if test_oai_id == reference_oai_id:
-            self.results.append(('Incremental%s' % verb, 'ok', 'Incremental harvesting works.'))
+            self.results.append(('Incremental%s' % verb, 'ok', 
+                                'Incremental harvesting works.'))
         else:
-            self.results.append(('Incremental%s' % verb, 'error', 'No incremental harvesting.'))
+            self.results.append(('Incremental%s' % verb, 'error', 
+                                'No incremental harvesting.'))
 
     def minimal_dc_elements(self, minimal_set=MINIMAL_DC_SET):
         """Check for the minimal set of Dublin Core elements. Return True if OK.
@@ -199,7 +208,8 @@ class Validator(object):
         try:
             records = get_records(self.base_url)
         except Exception, exc:
-            self.results.append(('MinimalDC', 'unverified', exc.args[0]))
+            message = 'Minimal DC elements could not be checked: %s' % exc.args[0]
+            self.results.append(('MinimalDC', 'unverified', message))
             return
         for record in records:
             oai_id = record.find('.//' + OAI + 'identifier').text
@@ -207,41 +217,50 @@ class Validator(object):
             dc_tags = set([dc.tag[34:] for dc in dc_elements])
             intersect = minimal_set - dc_tags
             if intersect != set():
-                message = '''Every record should at least contain the following DC elements: %s
-Found a record (%s) missing the following DC element(s): %s'''
+                message = "Every record should at least contain the following DC \
+elements: %s. Found a record (%s) missing the following DC element(s): %s."
                 self.results.append(
                                      (
                                      'MinimalDC', 
                                      'warning', message \
-                                                % (", ".join(minimal_set), 
+                                                % (", ".join(minimal_set),
                                                     oai_id, 
                                                     ", ".join(intersect)
                                                   )
                                       )
                 )
                 return
-        self.results.append(('MinimalDC', 'ok', 'Minimal DC elments are present.'))
+        self.results.append(('MinimalDC', 'ok', 'Minimal DC elements are present.'))
 
     def dc_date_ISO(self):
         """Check if dc:date conforms to ISO 8601 (matches YYYY-MM-DD). Return
         True if OK or a dictionary of record IDs and invalid dates if not.
         """
         err_dict = {}
-        records = get_records(self.base_url)
+        try:
+            records = get_records(self.base_url)
+        except Exception, exc:
+            message = 'dc:date ISO 8601 conformance could not be checked: %s' % exc.args[0]
+            self.results.append(('ISO8601', 'unverified', message))
+            return
         for record in records:
             oai_id = record.find('.//' + OAI + 'identifier').text
             dc_dates = record.findall('.//' + DC + 'date')
             for dc_date in dc_dates:
                 if not re.match(DC_DATE_PATTERN, dc_date.text):
-                    message = '''Found a record (%s) whose dc:date is not
-conforming to ISO 8601''' % oai_id
+                    message = "Found a record (%s) whose dc:date is not \
+conforming to ISO 8601." % oai_id
                     self.results.append(('ISO8601', 'error', message))
                     return
         self.results.append(('ISO8601', 'ok', 'dc:dates conform to ISO 8601.'))
 
     def dc_language_ISO(self):
         """Check if dc:language conforms to ISO 639-3/-2B/-2T/-1."""
-        records = get_records(self.base_url)
+        try:
+            records = get_records(self.base_url)
+        except Exception, exc:
+            message = 'dc:language conformance to ISO 639 could not be checked: %s' % exc.args[0]
+            self.results.append(('ISO639', 'unverified', message))
         test_record = random.sample(records, 1)[0]
         oai_id = test_record.find('.//' + OAI + 'identifier').text
         language_elements = test_record.findall('.//' + DC + 'language')
