@@ -189,10 +189,10 @@ class Validator(object):
                             until=reference_datestamp)
         tree = etree.parse(remote)                    
         records = tree.findall('.//' + OAI + element)
-        if len(records) > 1:
+        if len(records) == 0:
             self.results.append(('Incremental%s' % verb, 'error', 
                                 'No incremental harvesting.'))
-        test_record = records[0]
+        test_record = random.sample(records, 1)[0]
         test_oai_id = test_record.find('.//' + OAI + 'identifier').text
         if test_oai_id == reference_oai_id:
             self.results.append(('Incremental%s' % verb, 'ok', 
@@ -261,10 +261,16 @@ conforming to ISO 8601." % oai_id
         except Exception, exc:
             message = 'dc:language conformance to ISO 639 could not be checked: %s' % exc.args[0]
             self.results.append(('ISO639', 'unverified', message))
+            return
         test_record = random.sample(records, 1)[0]
         oai_id = test_record.find('.//' + OAI + 'identifier').text
         language_elements = test_record.findall('.//' + DC + 'language')
         
+        if language_elements == []:
+            message = 'dc:language conformance to ISO 639 could not be checked: No dc:language element found.'
+            self.results.append(('ISO639', 'unverified', message))
+            return
+        iso = None
         for language_element in language_elements:
             language = language_element.text
             if language in ISO_639_3_CODES:
@@ -275,8 +281,6 @@ conforming to ISO 8601." % oai_id
                 iso = '639-2T'
             elif language in ISO_639_1_CODES:
                 iso = '639-1'
-            else:
-                iso = None
         if iso is None:
             message = 'dc:language should conform to ISO 639, found %s.' % language
             self.results.append(('ISO639', 'recommendation', message))
@@ -290,6 +294,32 @@ conforming to ISO 8601." % oai_id
         """
         pass
 
+    
+    def check_deleting_strategy(self):
+        try:
+            remote = request_oai(self.base_url, 'Identify')
+            tree = etree.parse(remote)
+            deleting_strategy = tree.find('.//' + OAI + 'deletedRecord').text
+        except AttributeError:
+            message = "Deleting strategy could not be checked: deletedRecord element not found."             
+            self.results.append(('DeletingStrategy', 'unverified', message))
+            return
+        except Exception, exc:
+            message = "Deleting strategy could not be checked: %s" % exc.args[0]
+            self.results.append(('DeletingStrategy', 'unverified', message))
+            return
+        if deleting_strategy == 'no':
+            message = "No deleting strategy -- recommended is persistent or \
+transient."
+            report = 'recommendation'    
+        elif deleting_strategy in ('transient', 'persistent'):
+            message = 'Deleting strategy is "%s"' % deleting_strategy
+            report = 'ok'
+        else:
+            message = 'Undefined deleting strategy: "%s"' % deleting_strategy
+            report = 'error'
+        self.results.append(('DeletingStrategy', report, message))
+            
     def check_driver_conformity(self):
         """Run checks required for conformance to DRIVER guidelines"""
         self.check_XML('Identify')
@@ -298,8 +328,11 @@ conforming to ISO 8601." % oai_id
         self.validate_XML('ListRecords')
         self.reasonable_batch_size('ListRecords')
         self.reasonable_batch_size('ListIdentifiers')
+        self.dc_language_ISO()
         self.dc_date_ISO()
         self.minimal_dc_elements()
+        self.incremental_harvesting('ListRecords')
+        self.check_deleting_strategy()
 
 
 def main():
