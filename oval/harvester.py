@@ -17,29 +17,34 @@ from urllib2 import HTTPError, URLError, Request
 from urllib import urlencode
 from StringIO import StringIO
 
+from ordereddict import OrderedDict
 from oval import __version__ as ovalversion
 
-CACHE = {}
+CACHE = OrderedDict()
     
 # Caching
 def is_obsolete(entry, duration):
     return time.time() - entry['time'] > duration
-    
-    
+
+
 def compute_key(function, args, kw):
     key = pickle.dumps((function.func_name, args, kw))
     return hashlib.sha1(key).hexdigest()
-    
-def memoize(duration=10):
+
+
+def memoize(duration=10, max_length=10):
     def _memoize(function):
         def __memoize(*args, **kw):
             key = compute_key(function, args, kw)
             
-            #do we have it?
+            #do we have a response for the request?
+            if len(CACHE) > max_length:
+                # Pop the least recent item from the cache
+                CACHE.popitem(last=False)
             if (key in CACHE and
                 not is_obsolete(CACHE[key], duration)):
                 return CACHE[key]['value']
-            #computing
+            #new request
             result = function(*args, **kw)
             CACHE[key] = {
                             'value': result,
@@ -49,11 +54,10 @@ def memoize(duration=10):
         return __memoize
     return _memoize
     
-@memoize(60)
-def request_oai(base_url, verb, retries=5,**kw):
-    """
-        Perform request to base_url with verb and OAI args. Return file like.
-        Note that "from" is a reserved word in Python; use "_from" instead.
+@memoize(duration=60, max_length=250)
+def request_oai(base_url, verb, method='POST', retries=5, **kw):
+    """Perform request to base_url with verb and OAI args. Return file like.
+    Note that "from" is a reserved word in Python; use "_from" instead.
     """
     params = kw
     params['verb'] = verb
@@ -62,10 +66,13 @@ def request_oai(base_url, verb, retries=5,**kw):
         params['from'] = params['_from']
         del params['_from']
     data = urlencode(params)
-    request = Request(base_url)
+    if method == 'POST':
+        request = Request(base_url)
+        request.add_data(data)
+    elif method == 'GET':
+        request = Request(base_url + data)
     request.add_header('User-Agent', 'oval/%s' % ovalversion)
-    request.add_data(data)
-    #url = base_url + urlencode(params)
+    
     for i in range(retries):
         try:
             remote = urllib2.urlopen(request).read()

@@ -22,6 +22,8 @@ from lxml import etree
 from lxml.etree import XMLSyntaxError
 from lxml.etree import DocumentInvalid
 
+import pdb
+
 from oval.harvester import request_oai
 from oval import DATA_PATH
 from oval import ISO_639_3_CODES, ISO_639_2B_CODES
@@ -72,21 +74,45 @@ class Validator(object):
         except Exception:
             raise
         
-        try:
-            remote = request_oai(self.base_url, 'Identify')
+        methods = ['POST', 'GET']
+        #HTTP-Method
+        supported_methods = self.check_HTTP_methods(methods)
+        if len(supported_methods) == 2:
+            message = 'Server supports both GET and POST method.'
+            self.results.append(('HTTPMethod', 'ok', message))
+            self.method = 'POST'
+        elif len(supported_methods) == 1:
+            supported_method = supported_methods[0]
+            message = 'Server accepts only %s requests.' % supported_method
+            self.results.append(('HTTPMethod', 'error', message))
+            self.method = supported_method
+        
+        remote = request_oai(self.base_url, 'Identify', method=self.method)
+        tree = etree.parse(remote)
+        self.repository_name = tree.find('.//' + OAI + 'repositoryName').text
+        self.admin_email = tree.find('.//' + OAI + 'adminEmail').text
+        
+    
+    def check_HTTP_methods(self, methods):
+        """Make sure server supports GET and POST as required. Return supported
+        method(s).
+        """
+        methods = methods
+        for method in methods:
+            remote = request_oai(self.base_url, 'Identify', method=method)
             tree = etree.parse(remote)
-            self.repository_name = tree.find('.//' + OAI + 'repositoryName').text
-            self.admin_email = tree.find('.//' + OAI + 'adminEmail').text
-        except Exception:
-            raise
+            error = tree.find('.//' + OAI + 'error')
+            if error is not None and error.text == 'No verb specified!':
+                methods.remove(method)
+        return methods
 
     def check_XML(self, verb, metadataPrefix='oai_dc'):
         """Check if XML response for OAI-PMH verb is well-formed."""
         try:
             if verb == 'Identify':
-                remote = request_oai(self.base_url, verb)
+                remote = request_oai(self.base_url, verb, method=self.method)
             elif verb == 'ListRecords':
-                remote = request_oai(self.base_url, verb, 
+                remote = request_oai(self.base_url, verb, method=self.method,
                                     metadataPrefix=metadataPrefix)
         except Exception, exc:
             message = "Well-formedness of %s could not be checked. Reason: %s" % (verb,
@@ -105,10 +131,10 @@ class Validator(object):
         """Check if XML returned for OAI-PMH verb is valid."""
         try:
             if verb == 'Identify':
-                remote = request_oai(self.base_url, verb)
+                remote = request_oai(self.base_url, verb, method=self.method)
 
             elif verb == 'ListRecords':
-                remote = request_oai(self.base_url, verb, 
+                remote = request_oai(self.base_url, verb, method=self.method,
                                         metadataPrefix=metadataPrefix)
             tree = etree.parse(remote)
         except Exception, exc:
@@ -138,7 +164,7 @@ class Validator(object):
             element = 'header'
         
         try:
-            remote = request_oai(self.base_url, verb, 
+            remote = request_oai(self.base_url, verb, method=self.method,
                                 metadataPrefix=metadataPrefix)
             tree = etree.parse(remote)
         except Exception, exc:
@@ -169,7 +195,7 @@ class Validator(object):
         if verb == 'ListIdentifiers':
             element = 'header'
         try:
-            remote = request_oai(self.base_url, verb, 
+            remote = request_oai(self.base_url, verb, method=self.method,
                                 metadataPrefix=metadataPrefix)
             tree = etree.parse(remote)
         except Exception, exc:
@@ -181,9 +207,8 @@ class Validator(object):
         
         # Draw a reference record
         reference_record = random.sample(records, 1)[0]
-        reference_datestamp = reference_record.find('.//' + OAI + 'datestamp').text
-        reference_oai_id = reference_record.find('.//' + OAI + 'identifier').text
-        remote = request_oai(self.base_url, verb, 
+        reference_datestamp = reference_record.find('.//' + OAI + 'datestamp').text[:10]
+        remote = request_oai(self.base_url, verb, method=self.method,
                             metadataPrefix=metadataPrefix, 
                             _from=reference_datestamp,
                             until=reference_datestamp)
@@ -191,15 +216,16 @@ class Validator(object):
         records = tree.findall('.//' + OAI + element)
         if len(records) == 0:
             self.results.append(('Incremental%s' % verb, 'error', 
-                                'No incremental harvesting.'))
+                                'No incremental harvesting of %s.' % verb))
+            return
         test_record = random.sample(records, 1)[0]
-        test_oai_id = test_record.find('.//' + OAI + 'identifier').text
-        if test_oai_id == reference_oai_id:
+        test_datestamp = test_record.find('.//' + OAI + 'datestamp').text[:10]
+        if test_datestamp == reference_datestamp:
             self.results.append(('Incremental%s' % verb, 'ok', 
-                                'Incremental harvesting works.'))
+                                'Incremental harvesting of %s works.' % verb))
         else:
             self.results.append(('Incremental%s' % verb, 'error', 
-                                'No incremental harvesting.'))
+                                'No incremental harvesting of %s.' % verb))
 
     def minimal_dc_elements(self, minimal_set=MINIMAL_DC_SET):
         """Check for the minimal set of Dublin Core elements. Return True if OK.
@@ -214,7 +240,8 @@ class Validator(object):
         for record in records:
             oai_id = record.find('.//' + OAI + 'identifier').text
             dc_elements = record.findall('.//' + DC + '*')
-            dc_tags = set([dc.tag[34:] for dc in dc_elements])
+            # Remove the namespace from dc:tags
+            dc_tags = set([dc.tag.replace(DC, '') for dc in dc_elements])
             intersect = minimal_set - dc_tags
             if intersect != set():
                 message = "Every record should at least contain the following DC \
@@ -248,8 +275,8 @@ elements: %s. Found a record (%s) missing the following DC element(s): %s."
             dc_dates = record.findall('.//' + DC + 'date')
             for dc_date in dc_dates:
                 if not re.match(DC_DATE_PATTERN, dc_date.text):
-                    message = "Found a record (%s) whose dc:date is not \
-conforming to ISO 8601." % oai_id
+                    message = 'Found a record (%s) whose dc:date is not \
+conforming to ISO 8601: "%s"' % (oai_id, dc_date.text)
                     self.results.append(('ISO8601', 'error', message))
                     return
         self.results.append(('ISO8601', 'ok', 'dc:dates conform to ISO 8601.'))
@@ -257,36 +284,45 @@ conforming to ISO 8601." % oai_id
     def dc_language_ISO(self):
         """Check if dc:language conforms to ISO 639-3/-2B/-2T/-1."""
         try:
-            records = get_records(self.base_url)
+            remote = request_oai(self.base_url, 'ListRecords', method=self.method,
+                                metadataPrefix='oai_dc')
+            tree = etree.parse(remote)
         except Exception, exc:
             message = 'dc:language conformance to ISO 639 could not be checked: %s' % exc.args[0]
             self.results.append(('ISO639', 'unverified', message))
             return
-        test_record = random.sample(records, 1)[0]
-        oai_id = test_record.find('.//' + OAI + 'identifier').text
-        language_elements = test_record.findall('.//' + DC + 'language')
-        
+        language_elements = tree.findall('.//' + DC + 'language')
         if language_elements == []:
-            message = 'dc:language conformance to ISO 639 could not be checked: No dc:language element found.'
+            message = 'dc:language conformance to ISO 639 could not be checked: \
+No dc:language element found.'
             self.results.append(('ISO639', 'unverified', message))
             return
-        iso = None
-        for language_element in language_elements:
-            language = language_element.text
-            if language in ISO_639_3_CODES:
-                iso = '639-3'
-            elif language in ISO_639_2B_CODES:
-                iso = '639-2B'
-            elif language in ISO_639_2T_CODES:
-                iso = '639-2T'
-            elif language in ISO_639_1_CODES:
-                iso = '639-1'
-        if iso is None:
-            message = 'dc:language should conform to ISO 639, found %s.' % language
-            self.results.append(('ISO639', 'recommendation', message))
-        else:
-            message = 'dc:language conforms to ISO %s.' % iso
-            self.results.append(('ISO639', 'ok', message))
+        records = tree.findall('.//' + OAI + 'record')
+        for record in records:
+            oai_id = record.find('.//' + OAI + 'identifier').text
+            language_elements = record.findall('.//' + DC + 'language')
+            if language_elements == []:
+                continue
+            for language_element in language_elements:
+                try:
+                    language = language_element.text
+                except AttributeError:
+                    continue
+                if language in ISO_639_3_CODES:
+                    iso = '639-3'
+                elif language in ISO_639_2B_CODES:
+                    iso = '639-2B'
+                elif language in ISO_639_2T_CODES:
+                    iso = '639-2T'
+                elif language in ISO_639_1_CODES:
+                    iso = '639-1'
+                else:
+                    message = 'dc:language should conform to ISO 639, \
+found "%s" (%s).' % (language, oai_id)
+                    self.results.append(('ISO639', 'recommendation', message))
+                    return  
+        message = 'dc:language conforms to ISO %s.' % iso
+        self.results.append(('ISO639', 'ok', message))
 
     def check_resumption_token(self, verb, metadataPrefix, batches=1):
         """Make sure that the resumption token works. Check as many batches
@@ -294,14 +330,13 @@ conforming to ISO 8601." % oai_id
         """
         pass
 
-    
     def check_deleting_strategy(self):
         try:
-            remote = request_oai(self.base_url, 'Identify')
+            remote = request_oai(self.base_url, 'Identify', method=self.method)
             tree = etree.parse(remote)
             deleting_strategy = tree.find('.//' + OAI + 'deletedRecord').text
         except AttributeError:
-            message = "Deleting strategy could not be checked: deletedRecord element not found."             
+            message = "Deleting strategy could not be checked: deletedRecord element not found."
             self.results.append(('DeletingStrategy', 'unverified', message))
             return
         except Exception, exc:
@@ -319,7 +354,7 @@ transient."
             message = 'Undefined deleting strategy: "%s"' % deleting_strategy
             report = 'error'
         self.results.append(('DeletingStrategy', report, message))
-            
+
     def check_driver_conformity(self):
         """Run checks required for conformance to DRIVER guidelines"""
         self.check_XML('Identify')
@@ -342,7 +377,7 @@ def main():
     parser.add_argument('base_url', type=str, help='the basic URL of the OAI-PMH interface')
     parser.add_argument('--driver', dest='driver', action='store_true', 
                         default=False, help='check conformance to DRIVER guidelines')
-                        
+    
     args = parser.parse_args()
     
     base_url = args.base_url
