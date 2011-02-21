@@ -102,7 +102,7 @@ class Validator(object):
             remote = request_oai(self.base_url, 'Identify', method=method)
             tree = etree.parse(remote)
             error = tree.find('.//' + OAI + 'error')
-            if error is not None and error.text == 'No verb specified!':
+            if error is not None:
                 methods.remove(method)
         return methods
 
@@ -115,7 +115,7 @@ class Validator(object):
                 remote = request_oai(self.base_url, verb, method=self.method,
                                     metadataPrefix=metadataPrefix)
         except Exception, exc:
-            message = "Well-formedness of %s could not be checked. Reason: %s" % (verb,
+            message = "Well-formedness of %s could not be checked: %s" % (verb,
                                                                         exc.args[0])
             self.results.append(('%sWellFormed' % verb, 'unverified', message))
             return
@@ -138,7 +138,7 @@ class Validator(object):
                                         metadataPrefix=metadataPrefix)
             tree = etree.parse(remote)
         except Exception, exc:
-            message = 'Validity of %s could not be checked. Reason: %s' % (verb,
+            message = 'Validity of %s could not be checked: %s' % (verb,
                                                                     exc.args[0])
             self.results.append(('%sValid' % verb, 'unverified', message))
             return
@@ -254,7 +254,7 @@ class Validator(object):
             return
         if len(records) == 0:
             message = "Minimal DC elements could not be checked: No records."
-            self.results.append(('Incremental%s' % verb, 'unverified', 
+            self.results.append(('MinimalDC', 'unverified', 
                                 message))
             return
         for record in records:
@@ -292,7 +292,7 @@ elements: %s. Found a record (%s) missing the following DC element(s): %s."
             return
         if len(records) == 0:
             message = "dc:date ISO 8601 conformance could not be checked: No records."
-            self.results.append(('Incremental%s' % verb, 'unverified', 
+            self.results.append(('ISO8601', 'unverified', 
                                 message))
             return
         for record in records:
