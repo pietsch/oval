@@ -13,7 +13,6 @@ import os
 
 import random
 import urllib2
-from urllib2 import URLError, HTTPError
 import re
 import argparse
 
@@ -21,8 +20,6 @@ import argparse
 from lxml import etree
 from lxml.etree import XMLSyntaxError
 from lxml.etree import DocumentInvalid
-
-import pdb
 
 from oval.harvester import request_oai
 from oval import DATA_PATH
@@ -57,6 +54,14 @@ def get_records(base_url, metadataPrefix='oai_dc'):
     tree = etree.parse(remote)
     records = tree.findall('.//' + OAI + 'record')
     return records
+
+def get_random_record(base_url, metadataPrefix='oai_dc'):
+    """Shortcut for getting a random record in oai_dc."""
+    remote = request_oai(base_url, 'ListRecords', metadataPrefix=metadataPrefix)
+    tree = etree.parse(remote)
+    records = tree.findall('.//' + OAI + 'record')
+    random_record = random.sample(records, 1)[0]
+    return random_record
 
 
 class Validator(object):
@@ -106,14 +111,37 @@ class Validator(object):
                 methods.remove(method)
         return methods
 
-    def check_XML(self, verb, metadataPrefix='oai_dc'):
+    def check_identify_base_url(self):
+        """Compare field baseURL in Identify response with self.base_url."""
+        try:
+            remote = request_oai(self.base_url, 'Identify', method=self.method)
+            tree = etree.parse(remote)
+            request_field = tree.find('.//' + OAI + 'request')
+        except Exception, exc:
+            message = "Could not compare basic URLs: %s" % exc.args[0]
+            self.results.append(('BaseURLMatch', 'unverified', message))
+            return
+        if request_field is None:
+            message = "Could not compare basic URLs: field request not found."
+            self.results.append(('BaseURLMatch', 'unverified', message))
+            return
+        request_url = request_field.text
+        if self.base_url[:-1] == request_url:
+            message = 'URL in "request"  matches provided basic URL (Identify).'
+            self.results.append(('BaseURLMatch', 'ok', message))
+        else:
+            message = 'Request seem to be redirected to: "%s"' % request_url
+            self.results.append(('BaseURLMatch', 'warning', message))
+            
+    def check_XML(self, verb, metadataPrefix='oai_dc', identifier=None):
         """Check if XML response for OAI-PMH verb is well-formed."""
         try:
-            if verb == 'Identify':
+            if verb in ('Identify', 'ListSets', 'ListMetadataFormats'):
                 remote = request_oai(self.base_url, verb, method=self.method)
-            elif verb == 'ListRecords':
+            elif verb in ('ListRecords', 'ListIdentifiers', 'GetRecord'):
                 remote = request_oai(self.base_url, verb, method=self.method,
-                                    metadataPrefix=metadataPrefix)
+                                    metadataPrefix=metadataPrefix, 
+                                    identifier=identifier)
         except Exception, exc:
             message = "Well-formedness of %s could not be checked: %s" % (verb,
                                                                         exc.args[0])
@@ -127,15 +155,16 @@ class Validator(object):
             self.results.append(('%sWellFormed' % verb, 'error', message))
 
 
-    def validate_XML(self, verb, metadataPrefix='oai_dc'):
+    def validate_XML(self, verb, metadataPrefix='oai_dc', identifier=None):
         """Check if XML returned for OAI-PMH verb is valid."""
         try:
-            if verb == 'Identify':
+            if verb in ('Identify', 'ListSets', 'ListMetadataFormats'):
                 remote = request_oai(self.base_url, verb, method=self.method)
 
-            elif verb == 'ListRecords':
+            elif verb in ('ListRecords', 'ListIdentifiers', 'GetRecord'):
                 remote = request_oai(self.base_url, verb, method=self.method,
-                                        metadataPrefix=metadataPrefix)
+                                        metadataPrefix=metadataPrefix, 
+                                        identifier=identifier)
             tree = etree.parse(remote)
         except Exception, exc:
             message = 'Validity of %s could not be checked: %s' % (verb,
@@ -175,20 +204,19 @@ class Validator(object):
         records = tree.findall('.//' + OAI + element)        
         batch_size = len(records)
         if batch_size < min_batch_size:
-            message = '%s batch size too small (%d), should be at least %d.' % \
-                       (verb, batch_size, min_batch_size)
+            message = ('%s batch size too small (%d), should be at least %d.' %
+                       (verb, batch_size, min_batch_size))
             self.results.append(('%sBatch' % verb, 'recommendation', message))
         elif batch_size > max_batch_size:
-            message = '%s batch size is too large (%d), should be at most %d.' % \
-                       (verb, batch_size, max_batch_size)
+            message = ('%s batch size is too large (%d), should be at most %d.' %
+                       (verb, batch_size, max_batch_size))
             self.results.append(('%sBatch' % verb, 'recommendation', message))
         else:
             message = '%s batch size is OK (%d).' % (verb, batch_size)
             self.results.append(('%sBatch' % verb, 'ok', message))
 
     def incremental_harvesting(self, verb, metadataPrefix='oai_dc'):
-        """Check if server supports incremental harvesting by date (returns
-        Boolean).
+        """Check if server supports incremental harvesting by date.
         """
         if verb == 'ListRecords':
             element = 'record'
@@ -243,9 +271,7 @@ class Validator(object):
                                 'No incremental harvesting of %s.' % verb))
 
     def minimal_dc_elements(self, minimal_set=MINIMAL_DC_SET):
-        """Check for the minimal set of Dublin Core elements. Return True if OK.
-        Raise MinimalDCError otherwise.
-        """
+        """Check for the minimal set of Dublin Core elements."""
         try:
             records = get_records(self.base_url)
         except Exception, exc:
@@ -264,18 +290,13 @@ class Validator(object):
             dc_tags = set([dc.tag.replace(DC, '') for dc in dc_elements])
             intersect = minimal_set - dc_tags
             if intersect != set():
-                message = "Every record should at least contain the following DC \
-elements: %s. Found a record (%s) missing the following DC element(s): %s."
-                self.results.append(
-                                     (
-                                     'MinimalDC', 
-                                     'warning', message \
-                                                % (", ".join(minimal_set),
-                                                    oai_id, 
-                                                    ", ".join(intersect)
-                                                  )
-                                      )
-                )
+                message = ("Every record should at least contain the DC "
+                          "elements: %s. Found a record (%s) missing the "
+                          "following DC element(s): %s.")
+                self.results.append(('MinimalDC', 'warning', message % (
+                                                         ", ".join(minimal_set),
+                                                          oai_id, 
+                                                        ", ".join(intersect))))
                 return
         self.results.append(('MinimalDC', 'ok', 'Minimal DC elements are present.'))
 
@@ -300,8 +321,8 @@ elements: %s. Found a record (%s) missing the following DC element(s): %s."
             dc_dates = record.findall('.//' + DC + 'date')
             for dc_date in dc_dates:
                 if not re.match(DC_DATE_PATTERN, dc_date.text):
-                    message = 'Found a record (%s) whose dc:date is not \
-conforming to ISO 8601: "%s"' % (oai_id, dc_date.text)
+                    message = ('Found a record (%s) whose dc:date is not '
+                        'conforming to ISO 8601: "%s"' % (oai_id, dc_date.text))
                     self.results.append(('ISO8601', 'error', message))
                     return
         self.results.append(('ISO8601', 'ok', 'dc:dates conform to ISO 8601.'))
@@ -318,8 +339,8 @@ conforming to ISO 8601: "%s"' % (oai_id, dc_date.text)
             return
         language_elements = tree.findall('.//' + DC + 'language')
         if language_elements == []:
-            message = 'dc:language conformance to ISO 639 could not be checked: \
-No dc:language element found.'
+            message = ('dc:language conformance to ISO 639 could not be checked: '
+                      'No dc:language element found.')
             self.results.append(('ISO639', 'unverified', message))
             return
         records = tree.findall('.//' + OAI + 'record')
@@ -342,8 +363,8 @@ No dc:language element found.'
                 elif language in ISO_639_1_CODES:
                     iso = '639-1'
                 else:
-                    message = 'dc:language should conform to ISO 639, \
-found "%s" (%s).' % (language, oai_id)
+                    message = ('dc:language should conform to ISO 639, '
+                            'found "%s" (%s).' % (language, oai_id))
                     self.results.append(('ISO639', 'recommendation', message))
                     return  
         message = 'dc:language conforms to ISO %s.' % iso
@@ -356,6 +377,7 @@ found "%s" (%s).' % (language, oai_id)
         pass
 
     def check_deleting_strategy(self):
+        """Report the deleting strategy; recommend persistent or transient"""
         try:
             remote = request_oai(self.base_url, 'Identify', method=self.method)
             tree = etree.parse(remote)
@@ -369,8 +391,8 @@ found "%s" (%s).' % (language, oai_id)
             self.results.append(('DeletingStrategy', 'unverified', message))
             return
         if deleting_strategy == 'no':
-            message = "No deleting strategy -- recommended is persistent or \
-transient."
+            message = ("No deleting strategy -- recommended is persistent or "
+                      "transient.")
             report = 'recommendation'    
         elif deleting_strategy in ('transient', 'persistent'):
             message = 'Deleting strategy is "%s"' % deleting_strategy
@@ -382,6 +404,7 @@ transient."
 
     def check_driver_conformity(self):
         """Run checks required for conformance to DRIVER guidelines"""
+        self.check_identify_base_url()
         self.check_XML('Identify')
         self.check_XML('ListRecords')
         self.validate_XML('Identify')

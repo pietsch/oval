@@ -62,9 +62,11 @@ def request_oai(base_url, verb, method='POST', retries=5, **kw):
     params = kw
     params['verb'] = verb
     # from is a reserved word in Python; use _from instead
-    if "_from" in params.keys():
+    if params.get("_from") is not None:
         params['from'] = params['_from']
         del params['_from']
+    if "identifier" in params and params.get("identifier") is None:
+        del params['identifier']
     data = urlencode(params)
     if method == 'POST':
         request = Request(base_url)
