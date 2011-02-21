@@ -33,5 +33,8 @@ setup(
     platforms='any',
     packages=find_packages(),
     include_package_data=True,
-    package_data={'oval': ['data/*.xsd', 'data/*.html', 'data/*.tab']}
+    package_data={'oval': ['data/*.xsd', 
+                           'data/*.html',
+                           'data/*.tab', 
+                           'data/*.pickle']}
 )

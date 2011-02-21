@@ -15,7 +15,8 @@ import random
 import urllib2
 import re
 import argparse
-
+import pickle
+from urlparse import urlparse
 
 from lxml import etree
 from lxml.etree import XMLSyntaxError
@@ -43,7 +44,10 @@ MINIMAL_DC_SET = set([
 
 # Date scheme according to ISO 8601
 DC_DATE_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}$')
-        
+
+# URLs of Repositories indexed in BASE 
+BASE_URLS = pickle.load(open(os.path.join(DATA_PATH, 'BASE_URLS.pickle')))
+
         
 # Helper functions
 def get_records(base_url, metadataPrefix='oai_dc'):
@@ -110,7 +114,16 @@ class Validator(object):
             if error is not None:
                 methods.remove(method)
         return methods
-
+    
+    def indexed_in_BASE(self):
+        """Check if the repository is indexed in BASE."""
+        netloc = urlparse(self.base_url).netloc
+        if netloc in BASE_URLS:
+            message = "Repository content is indexed by BASE."
+        else:
+            message = "Repository content is indexed by BASE."
+        self.results.append(('BASEIndex', 'info', message))
+    
     def check_identify_base_url(self):
         """Compare field baseURL in Identify response with self.base_url."""
         try:
@@ -127,7 +140,7 @@ class Validator(object):
             return
         request_url = request_field.text
         if self.base_url[:-1] == request_url:
-            message = 'URL in "request"  matches provided basic URL (Identify).'
+            message = 'URL in "request" (Identify) matches provided basic URL.'
             self.results.append(('BaseURLMatch', 'ok', message))
         else:
             message = 'Request seem to be redirected to: "%s"' % request_url
@@ -416,7 +429,7 @@ class Validator(object):
         self.minimal_dc_elements()
         self.incremental_harvesting('ListRecords')
         self.check_deleting_strategy()
-
+        self.indexed_in_BASE()
 
 def main():
     """Command line interface."""
