@@ -208,11 +208,17 @@ class Validator(object):
         # Draw a reference record
         reference_record = random.sample(records, 1)[0]
         reference_datestamp = reference_record.find('.//' + OAI + 'datestamp').text[:10]
-        remote = request_oai(self.base_url, verb, method=self.method,
-                            metadataPrefix=metadataPrefix, 
-                            _from=reference_datestamp,
-                            until=reference_datestamp)
-        tree = etree.parse(remote)                    
+        try:
+            remote = request_oai(self.base_url, verb, method=self.method,
+                                metadataPrefix=metadataPrefix, 
+                                _from=reference_datestamp,
+                                until=reference_datestamp)
+            tree = etree.parse(remote)
+        except Exception, exc:
+            message = "Incremental harvesting could not be checked: %s" % exc.args[0]
+            self.results.append(('Incremental%s' % verb, 'unverified', 
+                                message))
+            return
         records = tree.findall('.//' + OAI + element)
         if len(records) == 0:
             self.results.append(('Incremental%s' % verb, 'error', 
