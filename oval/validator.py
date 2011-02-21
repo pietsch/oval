@@ -198,16 +198,25 @@ class Validator(object):
             remote = request_oai(self.base_url, verb, method=self.method,
                                 metadataPrefix=metadataPrefix)
             tree = etree.parse(remote)
+            records = tree.findall('.//' + OAI + element)
         except Exception, exc:
             message = "Incremental harvesting could not be checked: %s" % exc.args[0]
             self.results.append(('Incremental%s' % verb, 'unverified', 
                                 message))
             return
-        records = tree.findall('.//' + OAI + element)
-        
-        # Draw a reference record
+        if len(records) == 0:
+            message = "Incremental harvesting could not be checked: No records."
+            self.results.append(('Incremental%s' % verb, 'unverified', 
+                                message))
+            return
         reference_record = random.sample(records, 1)[0]
-        reference_datestamp = reference_record.find('.//' + OAI + 'datestamp').text[:10]
+        reference_datestamp_elem = reference_record.find('.//' + OAI + 'datestamp')
+        if reference_datestamp_elem is None:
+            message = "Incremental harvesting could not be checked: No no datestamp."
+            self.results.append(('Incremental%s' % verb, 'unverified', 
+                                message))
+            return
+        reference_datestamp = reference_datestamp_elem.text[:10]
         try:
             remote = request_oai(self.base_url, verb, method=self.method,
                                 metadataPrefix=metadataPrefix, 
@@ -243,6 +252,11 @@ class Validator(object):
             message = 'Minimal DC elements could not be checked: %s' % exc.args[0]
             self.results.append(('MinimalDC', 'unverified', message))
             return
+        if len(records) == 0:
+            message = "Minimal DC elements could not be checked: No records."
+            self.results.append(('Incremental%s' % verb, 'unverified', 
+                                message))
+            return
         for record in records:
             oai_id = record.find('.//' + OAI + 'identifier').text
             dc_elements = record.findall('.//' + DC + '*')
@@ -275,6 +289,11 @@ elements: %s. Found a record (%s) missing the following DC element(s): %s."
         except Exception, exc:
             message = 'dc:date ISO 8601 conformance could not be checked: %s' % exc.args[0]
             self.results.append(('ISO8601', 'unverified', message))
+            return
+        if len(records) == 0:
+            message = "dc:date ISO 8601 conformance could not be checked: No records."
+            self.results.append(('Incremental%s' % verb, 'unverified', 
+                                message))
             return
         for record in records:
             oai_id = record.find('.//' + OAI + 'identifier').text
