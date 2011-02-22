@@ -220,8 +220,13 @@ class Validator(object):
             self.results.append(('%sBatch' % verb, 'unverified', message))
             return
         
-        records = tree.findall('.//' + OAI + element)        
+        records = tree.findall('.//' + OAI + element)
         batch_size = len(records)
+        
+        if batch_size == 0:
+            message = ('%s batch size could not be checked: No records.' % verb)
+            self.results.append(('%sBatch' % verb, 'unverified', message))
+            return
         if batch_size < min_batch_size:
             message = ('%s batch size too small (%d), should be at least %d.' %
                        (verb, batch_size, min_batch_size))
@@ -436,7 +441,7 @@ class Validator(object):
             return
         if len(records) == 0:
             message = "Could not check URL in dc:identifier: No records."
-            self.results.append('DCIdentifierURL', 'error', message)
+            self.results.append(('DCIdentifierURL', 'unverified', message))
             return
         found_abs_urls = set()
         for record in records:
@@ -463,7 +468,7 @@ class Validator(object):
                         % list(found_abs_urls)[0])
             self.results.append(('DCIdentifierURL', 'warning', message))
             return
-        message = ("Every record contains an absolute URL in dc:identifier.")
+        message = "Every record contains an absolute URL in dc:identifier."
         self.results.append(('DCIdentifierURL', 'ok', message))
                 
     def check_driver_conformity(self):
@@ -483,8 +488,8 @@ class Validator(object):
         self.dc_date_ISO()
         self.minimal_dc_elements()
         self.incremental_harvesting('ListRecords')
-        self.check_deleting_strategy()
         self.dc_identifier_abs()
+        self.check_deleting_strategy()
         self.indexed_in_BASE()
 
 def main():
