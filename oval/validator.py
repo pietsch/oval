@@ -5,7 +5,7 @@
     ~~~~~~~~~~~~
 
     The core module of oval.
-
+    
     :copyright: Copyright 2011 Mathias Loesch.
 """
 
@@ -83,10 +83,14 @@ class Validator(object):
             self.base_url = base_url
         else:
             self.base_url = base_url + '?'
-        try: 
-            urllib2.urlopen(self.base_url)
-        except Exception:
-            raise
+
+        # Intended as first test if the OAI-PMH interface is reachable.
+        # However, some repos do not implement a request without verbs.
+        
+        # try: 
+        #     urllib2.urlopen(self.base_url)
+        # except Exception:
+        #     raise
         
         methods = ['POST', 'GET']
         #HTTP-Method
