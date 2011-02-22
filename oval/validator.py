@@ -17,6 +17,8 @@ import re
 import argparse
 import pickle
 from urlparse import urlparse
+from dateutil import parser as dateparser
+
 
 from lxml import etree
 from lxml.etree import XMLSyntaxError
@@ -42,8 +44,11 @@ MINIMAL_DC_SET = set([
                 'creator'
 ])
 
-# Date scheme according to ISO 8601
-DC_DATE_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+# Date schemes according to ISO 8601 (increasing granularity)
+DC_DATE_YEAR = re.compile(r'^\d{4}$')
+DC_DATE_MONTH = re.compile(r'^\d{4}-\d{2}$')
+DC_DATE_DAY = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+DC_DATE_FULL = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([+-]\d{2}:\d{2}|Z)$')
 
 # URLs of Repositories indexed in BASE 
 BASE_URLS = pickle.load(open(os.path.join(DATA_PATH, 'BASE_URLS.pickle')))
@@ -143,7 +148,7 @@ class Validator(object):
             message = 'URL in "request" (Identify) matches provided basic URL.'
             self.results.append(('BaseURLMatch', 'ok', message))
         else:
-            message = 'Request seem to be redirected to: "%s"' % request_url
+            message = 'Requests seem to be redirected to: "%s"' % request_url
             self.results.append(('BaseURLMatch', 'warning', message))
             
     def check_XML(self, verb, metadataPrefix='oai_dc', identifier=None):
@@ -151,10 +156,10 @@ class Validator(object):
         try:
             if verb in ('Identify', 'ListSets', 'ListMetadataFormats'):
                 remote = request_oai(self.base_url, verb, method=self.method)
-            elif verb in ('ListRecords', 'ListIdentifiers', 'GetRecord'):
+            elif verb in ('ListRecords', 'ListIdentifiers'):
                 remote = request_oai(self.base_url, verb, method=self.method,
                                     metadataPrefix=metadataPrefix, 
-                                    identifier=identifier)
+                                    identifier=identifier)                
         except Exception, exc:
             message = "Well-formedness of %s could not be checked: %s" % (verb,
                                                                         exc.args[0])
@@ -162,7 +167,8 @@ class Validator(object):
             return
         try:        
             etree.parse(remote)
-            self.results.append(('%sWellFormed' % verb, 'ok', '%s response is well-formed.' % verb))
+            self.results.append(('%sWellFormed' % verb, 'ok', '%s response is '
+                                'well-formed.' % verb))
         except XMLSyntaxError, exc:
             message = '%s response is not well-formed: %s' % (verb, exc.args[0])
             self.results.append(('%sWellFormed' % verb, 'error', message))
@@ -225,7 +231,7 @@ class Validator(object):
                        (verb, batch_size, max_batch_size))
             self.results.append(('%sBatch' % verb, 'recommendation', message))
         else:
-            message = '%s batch size is OK (%d).' % (verb, batch_size)
+            message = '%s batch size is %d.' % (verb, batch_size)
             self.results.append(('%sBatch' % verb, 'ok', message))
 
     def incremental_harvesting(self, verb, metadataPrefix='oai_dc'):
@@ -333,10 +339,14 @@ class Validator(object):
             oai_id = record.find('.//' + OAI + 'identifier').text
             dc_dates = record.findall('.//' + DC + 'date')
             for dc_date in dc_dates:
-                if not re.match(DC_DATE_PATTERN, dc_date.text):
-                    message = ('Found a record (%s) whose dc:date is not '
-                        'conforming to ISO 8601: "%s"' % (oai_id, dc_date.text))
-                    self.results.append(('ISO8601', 'error', message))
+                date = dc_date.text
+                if not (DC_DATE_YEAR.match(date) or
+                        DC_DATE_MONTH.match(date) or
+                        DC_DATE_DAY.match(date) or 
+                        DC_DATE_FULL.match(date)):
+                    message = ('Found a record (%s) where the content of dc:date '
+                        'is not conforming to ISO 8601: "%s"' % (oai_id, date))
+                    self.results.append(('ISO8601', 'warning', message))
                     return
         self.results.append(('ISO8601', 'ok', 'dc:dates conform to ISO 8601.'))
 
@@ -404,7 +414,7 @@ class Validator(object):
             self.results.append(('DeletingStrategy', 'unverified', message))
             return
         if deleting_strategy == 'no':
-            message = ("No deleting strategy -- recommended is persistent or "
+            message = (u"No deleting strategy – recommended is persistent or "
                       "transient.")
             report = 'recommendation'    
         elif deleting_strategy in ('transient', 'persistent'):
@@ -415,13 +425,57 @@ class Validator(object):
             report = 'error'
         self.results.append(('DeletingStrategy', report, message))
 
+    def dc_identifier_abs(self):
+        """Check if dc:identifier contains an absolute URL."""
+        try:
+            records = get_records(self.base_url)
+        except Exception, exc:
+            message = "Could not check URL in dc:identifier: %s" % exc.args[0]
+            self.results.append('DCIdentifierURL', 'error', message)
+            return
+        if len(records) == 0:
+            message = "Could not check URL in dc:identifier: No records."
+            self.results.append('DCIdentifierURL', 'error', message)
+            return
+        found_abs_urls = set()
+        for record in records:
+            abs_url = False
+            oai_id = record.find('.//' + OAI + 'identifier').text
+            identifiers = record.findall('.//' + DC + 'identifier')
+            if identifiers == []:
+                message = ("Found at least one record missing dc:identifier: %s"
+                            % oai_id)
+                self.results.append(('DCIdentifierURL', 'warning', message))
+                return
+            for identifier_element in identifiers:
+                identifier = identifier_element.text
+                if urlparse(identifier).scheme == 'http':
+                    abs_url = True
+                    found_abs_urls.add(identifier)
+            if abs_url == False:
+                message = ("Found at least one record missing an absolute URL "
+                           "in dc:identifier: %s" % oai_id)
+                self.results.append(('DCIdentifierURL', 'warning', message))
+                return
+        if len(records) > 1 and len(found_abs_urls) == 1:
+            message = ("All records have the same URL in dc:identifier: %s"
+                        % list(found_abs_urls)[0])
+            self.results.append(('DCIdentifierURL', 'warning', message))
+            return
+        message = ("Every record contains an absolute URL in dc:identifier.")
+        self.results.append(('DCIdentifierURL', 'ok', message))
+                
     def check_driver_conformity(self):
         """Run checks required for conformance to DRIVER guidelines"""
         self.check_identify_base_url()
         self.check_XML('Identify')
         self.check_XML('ListRecords')
+        self.check_XML('ListIdentifiers')
+        self.check_XML('ListSets')
         self.validate_XML('Identify')
         self.validate_XML('ListRecords')
+        self.validate_XML('ListIdentifiers')
+        self.validate_XML('ListSets')
         self.reasonable_batch_size('ListRecords')
         self.reasonable_batch_size('ListIdentifiers')
         self.dc_language_ISO()
@@ -429,6 +483,7 @@ class Validator(object):
         self.minimal_dc_elements()
         self.incremental_harvesting('ListRecords')
         self.check_deleting_strategy()
+        self.dc_identifier_abs()
         self.indexed_in_BASE()
 
 def main():
