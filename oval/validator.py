@@ -92,7 +92,7 @@ class Validator(object):
         #HTTP-Method
         supported_methods = self.check_HTTP_methods(methods)
         if len(supported_methods) == 2:
-            message = 'Server supports both GET and POST method.'
+            message = 'Server supports both GET and POST requests.'
             self.results.append(('HTTPMethod', 'ok', message))
             self.method = 'POST'
         elif len(supported_methods) == 1:
