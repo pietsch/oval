@@ -317,7 +317,8 @@ class Validator(object):
                                                           oai_id, 
                                                         ", ".join(intersect))))
                 return
-        self.results.append(('MinimalDC', 'ok', 'Minimal DC elements are present.'))
+        self.results.append(('MinimalDC', 'ok', 'Minimal DC elements (%s) are '
+                            'present.' % ', '.join(minimal_set)))
 
     def dc_date_ISO(self):
         """Check if dc:date conforms to ISO 8601 (matches YYYY-MM-DD). Return
