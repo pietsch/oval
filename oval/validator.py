@@ -109,7 +109,7 @@ class Validator(object):
                 self.method = supported_method
         except Exception, exc:
             message = ('Could not determine supported HTTP methods: %s '
-                      'Falling back to GET.' % str(exc))
+                      'Falling back to GET.' % unicode(exc))
             self.results.append(('HTTPMethod', 'error', message))
             self.method = 'GET'
         
@@ -127,7 +127,7 @@ class Validator(object):
             except AttributeError, exc:
                 self.admin_email = '[No email provided or not found.]'
         except (URLError, XMLSyntaxError), exc:
-            message = 'Could not fetch general repository information: %s' % str(exc)
+            message = 'Could not fetch general repository information: %s' % unicode(exc)
             self.results.append(('RepositoryInformation', 'error', message))
             self.repository_name = '[Could not fetch name.]'
             self.admin_email = '[Could not fetch email.]'
@@ -151,7 +151,7 @@ class Validator(object):
             remote = urllib2.urlopen(self.base_url + 'verb=Identify')
             xml_string = remote.read()
         except URLError, exc:
-            message = "Could not determine protocol version: %s Assuming 2.0" % str(exc)
+            message = "Could not determine protocol version: %s Assuming 2.0" % unicode(exc)
             self.results.append(('ProtocolVersion', 'error', message))
             return '2.0'
         m = VERSION_PATTERN.search(xml_string)
@@ -193,7 +193,7 @@ class Validator(object):
             tree = etree.parse(remote)
             request_field = tree.find('.//' + self.oai + request_tagname)
         except Exception, exc:
-            message = "Could not compare basic URLs: %s" % str(exc)
+            message = "Could not compare basic URLs: %s" % unicode(exc)
             self.results.append(('BaseURLMatch', 'unverified', message))
             return
         if request_field is None:
@@ -219,7 +219,7 @@ class Validator(object):
                                     identifier=identifier)                
         except Exception, exc:
             message = "Well-formedness of %s could not be checked: %s" % (verb,
-                                                                        str(exc))
+                                                                        unicode(exc))
             self.results.append(('%sWellFormed' % verb, 'unverified', message))
             return
         try:        
@@ -227,7 +227,7 @@ class Validator(object):
             self.results.append(('%sWellFormed' % verb, 'ok', '%s response is '
                                 'well-formed.' % verb))
         except XMLSyntaxError, exc:
-            message = '%s response is not well-formed: %s' % (verb, str(exc))
+            message = '%s response is not well-formed: %s' % (verb, unicode(exc))
             self.results.append(('%sWellFormed' % verb, 'error', message))
 
 
@@ -244,7 +244,7 @@ class Validator(object):
             tree = etree.parse(remote)
         except Exception, exc:
             message = 'Validity of %s could not be checked: %s' % (verb,
-                                                                    str(exc))
+                                                                    unicode(exc))
             self.results.append(('%sValid' % verb, 'unverified', message))
             return
         schema_file = os.path.join(DATA_PATH, 'combined.xsd')
@@ -254,7 +254,7 @@ class Validator(object):
             schema.assertValid(tree)
             self.results.append(('%sValid' % verb, 'ok', '%s response is valid.' % verb))
         except DocumentInvalid, exc:
-            message = "%s response is invalid. %s" % (verb, str(exc))
+            message = "%s response is invalid. %s" % (verb, unicode(exc))
             self.results.append(('%sValid' % verb, 'error', message))
 
     def reasonable_batch_size(self, verb, metadataPrefix='oai_dc', 
@@ -273,7 +273,7 @@ class Validator(object):
                                 metadataPrefix=metadataPrefix)
             tree = etree.parse(remote)
         except Exception, exc:
-            message = "%s batch size could not be checked: %s" % (verb, str(exc))
+            message = "%s batch size could not be checked: %s" % (verb, unicode(exc))
             self.results.append(('%sBatch' % verb, 'unverified', message))
             return
         
@@ -309,7 +309,7 @@ class Validator(object):
             tree = etree.parse(remote)
             records = tree.findall('.//' + self.oai + element)
         except Exception, exc:
-            message = "Incremental harvesting could not be checked: %s" % str(exc)
+            message = "Incremental harvesting could not be checked: %s" % unicode(exc)
             self.results.append(('Incremental%s' % verb, 'unverified', 
                                 message))
             return
@@ -333,7 +333,7 @@ class Validator(object):
                                 until=reference_datestamp)
             tree = etree.parse(remote)
         except Exception, exc:
-            message = "Incremental harvesting could not be checked: %s" % str(exc)
+            message = "Incremental harvesting could not be checked: %s" % unicode(exc)
             self.results.append(('Incremental%s' % verb, 'unverified', 
                                 message))
             return
@@ -358,7 +358,7 @@ class Validator(object):
                                 metadataPrefix='oai_dc')
             tree = etree.parse(remote)
         except (URLError, XMLSyntaxError), exc:
-            message = 'Minimal DC elements could not be checked: %s' % str(exc)
+            message = 'Minimal DC elements could not be checked: %s' % unicode(exc)
             self.results.append(('MinimalDC', 'unverified', message))
             return
         records = tree.findall('.//' + self.oai + 'record')
@@ -395,7 +395,7 @@ class Validator(object):
                                 metadataPrefix='oai_dc')
             tree = etree.parse(remote)
         except (URLError, XMLSyntaxError), exc:
-            message = 'dc:date ISO 8601 conformance could not be checked: %s' % str(exc)
+            message = 'dc:date ISO 8601 conformance could not be checked: %s' % unicode(exc)
             self.results.append(('ISO8601', 'unverified', message))
             return
         records = tree.findall('.//' + self.oai + 'record')
@@ -426,7 +426,7 @@ class Validator(object):
                                 metadataPrefix='oai_dc')
             tree = etree.parse(remote)
         except (URLError, XMLSyntaxError), exc:
-            message = 'dc:language conformance to ISO 639 could not be checked: %s' % str(exc)
+            message = 'dc:language conformance to ISO 639 could not be checked: %s' % unicode(exc)
             self.results.append(('ISO639', 'unverified', message))
             return
         language_elements = tree.findall('.//' + DC + 'language')
@@ -479,7 +479,7 @@ class Validator(object):
             self.results.append(('DeletingStrategy', 'unverified', message))
             return
         except Exception, exc:
-            message = "Deleting strategy could not be checked: %s" % str(exc)
+            message = "Deleting strategy could not be checked: %s" % unicode(exc)
             self.results.append(('DeletingStrategy', 'unverified', message))
             return
         if deleting_strategy == 'no':
@@ -501,7 +501,7 @@ class Validator(object):
                                 metadataPrefix='oai_dc')
             tree = etree.parse(remote)
         except (URLError, XMLSyntaxError), exc:
-            message = "Could not check URL in dc:identifier: %s" % str(exc)
+            message = "Could not check URL in dc:identifier: %s" % unicode(exc)
             self.results.append(('DCIdentifierURL', 'unverified', message))
             return
         records = tree.findall('.//' + self.oai + 'record')
@@ -521,6 +521,8 @@ class Validator(object):
                 return
             for identifier_element in identifiers:
                 identifier = identifier_element.text
+                if identifier is None:
+                    continue
                 if urlparse(identifier).scheme == 'http':
                     abs_url = True
                     found_abs_urls.add(identifier)
