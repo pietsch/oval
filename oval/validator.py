@@ -139,7 +139,7 @@ class Validator(object):
         """
         methods = methods
         for method in methods:
-            remote = urllib2.urlopen(self.base_url + 'verb=Identify')
+            remote = request_oai(self.base_url, verb='Identify', method=method)
             tree = etree.parse(remote)
             error = tree.find('.//' + self.oai + 'error')
             if error is not None:
