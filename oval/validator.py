@@ -277,6 +277,12 @@ class Validator(object):
             self.results.append(('%sBatch' % verb, 'unverified', message))
             return
         
+        resumption_token = tree.find('.//' + self.oai + 'resumptionToken')
+        if resumption_token is None:
+            message = ('%s batch size could not be checked: Only one batch.' % verb)
+            self.results.append(('%sBatch' % verb, 'unverified', message))
+            return
+        
         records = tree.findall('.//' + self.oai + element)
         batch_size = len(records)
         
@@ -374,7 +380,7 @@ class Validator(object):
             dc_tags = set([dc.tag.replace(DC, '') for dc in dc_elements])
             intersect = minimal_set - dc_tags
             if intersect != set():
-                message = ("Every record should at least contain the DC "
+                message = ("Records should at least contain the DC "
                           "elements: %s. Found a record (%s) missing the "
                           "following DC element(s): %s.")
                 self.results.append(('MinimalDC', 'warning', message % (
@@ -536,7 +542,7 @@ class Validator(object):
                         % list(found_abs_urls)[0])
             self.results.append(('DCIdentifierURL', 'warning', message))
             return
-        message = "Every record contains an absolute URL in dc:identifier."
+        message = "Tested records contain absolute URLs in dc:identifier."
         self.results.append(('DCIdentifierURL', 'ok', message))
                 
     def check_driver_conformity(self):
