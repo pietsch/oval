@@ -489,7 +489,7 @@ class Validator(object):
             self.results.append(('DeletingStrategy', 'unverified', message))
             return
         if deleting_strategy == 'no':
-            message = (u'Deleting strategy is "%s" – recommended is persistent or '
+            message = (u'Deleting strategy is "no" – recommended is persistent or '
                       'transient.')
             report = 'recommendation'    
         elif deleting_strategy in ('transient', 'persistent'):
