@@ -18,6 +18,7 @@ import re
 import argparse
 import pickle
 from urlparse import urlparse
+from datetime import datetime
 from dateutil import parser as dateparser
 
 
@@ -207,32 +208,9 @@ class Validator(object):
         else:
             message = 'Requests seem to be redirected to: "%s"' % request_url
             self.results.append(('BaseURLMatch', 'warning', message))
-            
-    def check_XML(self, verb, metadataPrefix='oai_dc', identifier=None):
-        """Check if XML response for OAI-PMH verb is well-formed."""
-        try:
-            if verb in ('Identify', 'ListSets', 'ListMetadataFormats'):
-                remote = request_oai(self.base_url, verb, method=self.method)
-            elif verb in ('ListRecords', 'ListIdentifiers'):
-                remote = request_oai(self.base_url, verb, method=self.method,
-                                    metadataPrefix=metadataPrefix, 
-                                    identifier=identifier)                
-        except Exception, exc:
-            message = "Well-formedness of %s could not be checked: %s" % (verb,
-                                                                        unicode(exc))
-            self.results.append(('%sWellFormed' % verb, 'unverified', message))
-            return
-        try:        
-            etree.parse(remote)
-            self.results.append(('%sWellFormed' % verb, 'ok', '%s response is '
-                                'well-formed.' % verb))
-        except XMLSyntaxError, exc:
-            message = '%s response is not well-formed: %s' % (verb, unicode(exc))
-            self.results.append(('%sWellFormed' % verb, 'error', message))
-
 
     def validate_XML(self, verb, metadataPrefix='oai_dc', identifier=None):
-        """Check if XML returned for OAI-PMH verb is valid."""
+        """Check if XML returned for OAI-PMH verb is well-formed and valid."""
         try:
             if verb in ('Identify', 'ListSets', 'ListMetadataFormats'):
                 remote = request_oai(self.base_url, verb, method=self.method)
@@ -241,21 +219,26 @@ class Validator(object):
                 remote = request_oai(self.base_url, verb, method=self.method,
                                         metadataPrefix=metadataPrefix, 
                                         identifier=identifier)
-            tree = etree.parse(remote)
         except Exception, exc:
-            message = 'Validity of %s could not be checked: %s' % (verb,
+            message = 'XML response of %s could not be checked: %s' % (verb,
                                                                     unicode(exc))
-            self.results.append(('%sValid' % verb, 'unverified', message))
+            self.results.append(('%sXML' % verb, 'unverified', message))
+            return
+        try:        
+            tree = etree.parse(remote)
+        except XMLSyntaxError, exc:
+            message = '%s response is not well-formed: %s' % (verb, unicode(exc))
+            self.results.append(('%sXML' % verb, 'error', message))
             return
         schema_file = os.path.join(DATA_PATH, 'combined.xsd')
         schema_tree = etree.parse(schema_file)
         schema = etree.XMLSchema(schema_tree)
         try:
             schema.assertValid(tree)
-            self.results.append(('%sValid' % verb, 'ok', '%s response is valid.' % verb))
+            self.results.append(('%sXML' % verb, 'ok', '%s response well-formed and valid.' % verb))
         except DocumentInvalid, exc:
-            message = "%s response is invalid. %s" % (verb, unicode(exc))
-            self.results.append(('%sValid' % verb, 'error', message))
+            message = "%s response well-formed but invalid: %s" % (verb, unicode(exc))
+            self.results.append(('%sXML' % verb, 'error', message))
 
     def reasonable_batch_size(self, verb, metadataPrefix='oai_dc', 
                             min_batch_size=100, max_batch_size=500):
@@ -468,11 +451,45 @@ class Validator(object):
         message = 'dc:language conforms to ISO %s.' % iso
         self.results.append(('ISO639', 'ok', message))
 
-    def check_resumption_token(self, verb, metadataPrefix, batches=1):
-        """Make sure that the resumption token works. Check as many batches
-        as specified (default: 1).
+    def check_resumption_expiration_date(self, verb, metadataPrefix):
+        """Make sure that the resumption token is good for 24h.
         """
-        pass
+        try:
+            remote = request_oai(self.base_url, 'ListRecords', method=self.method,
+                                metadataPrefix='oai_dc')
+            tree = etree.parse(remote)
+        except Exception, exc:
+            message = 'Expiration date of resumtion token could not be checked: %s' % unicode(exc)
+            self.results.append(('ResumptionTokenExp', 'unverified', message))
+            return
+        resumption_token = tree.find('.//' + self.oai + 'resumptionToken')
+        if resumption_token is None:
+            message = 'Expiration date of resumtion token could not be checked: No token found.' % unicode(exc)
+            self.results.append(('ResumptionTokenExp', 'unverified', message))
+            return
+        attribs = resumption_token.attrib
+        expiration_date = attribs.get('expirationDate')
+        if expiration_date is None:
+            message = 'Expiration date of resumtion token could not be checked: expirationDate not supported.'
+            self.results.append(('ResumptionTokenExp', 'unverified', message))
+            return
+        try:
+            parsed_expiration_date = dateparser.parse(expiration_date)
+        except ValueError:
+            message = 'Expiration date of resumtion token could not be checked: invalid date format: %s' % expiration_date
+            self.results.append(('ResumptionTokenExp', 'error', message))
+            return
+        tz = parsed_expiration_date.tzinfo
+        now = datetime.now(tz)
+        delta = parsed_expiration_date - now
+        delta_hours = delta.seconds / 60 / 60
+        if delta_hours < 23:
+            message = 'Resumtion token should last 24 hours. This one lasts: %d' % delta_hours
+            self.results.append(('ResumptionTokenExp', 'recommendation', message))
+            return
+        message = 'Resumtion token lasts %d hours.' % delta_hours
+        self.results.append(('ResumptionTokenExp', 'ok', message))
+        return
 
     def check_deleting_strategy(self):
         """Report the deleting strategy; recommend persistent or transient"""
@@ -548,14 +565,11 @@ class Validator(object):
     def check_driver_conformity(self):
         """Run checks required for conformance to DRIVER guidelines"""
         self.check_identify_base_url()
-        self.check_XML('Identify')
-        self.check_XML('ListRecords')
-        self.check_XML('ListIdentifiers')
-        self.check_XML('ListSets')
         self.validate_XML('Identify')
         self.validate_XML('ListRecords')
         self.validate_XML('ListIdentifiers')
         self.validate_XML('ListSets')
+        self.check_resumption_expiration_date('ListRecords', 'oai_dc')
         self.reasonable_batch_size('ListRecords')
         self.reasonable_batch_size('ListIdentifiers')
         self.dc_language_ISO()
