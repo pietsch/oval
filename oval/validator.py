@@ -451,32 +451,32 @@ class Validator(object):
         message = 'dc:language conforms to ISO %s.' % iso
         self.results.append(('ISO639', 'ok', message))
 
-    def check_resumption_expiration_date(self, verb, metadataPrefix):
-        """Make sure that the resumption token is good for 24h.
+    def check_resumption_expiration_date(self, verb, metadataPrefix='oai_dc'):
+        """Make sure that the resumption token is good for at least 24h.
         """
         try:
             remote = request_oai(self.base_url, 'ListRecords', method=self.method,
                                 metadataPrefix='oai_dc')
             tree = etree.parse(remote)
         except Exception, exc:
-            message = 'Expiration date of resumtion token could not be checked: %s' % unicode(exc)
+            message = 'Expiration date of resumption token could not be checked: %s' % unicode(exc)
             self.results.append(('ResumptionTokenExp', 'unverified', message))
             return
         resumption_token = tree.find('.//' + self.oai + 'resumptionToken')
         if resumption_token is None:
-            message = 'Expiration date of resumtion token could not be checked: No token found.' % unicode(exc)
+            message = 'Expiration date of resumption token could not be checked: No token found'
             self.results.append(('ResumptionTokenExp', 'unverified', message))
             return
         attribs = resumption_token.attrib
         expiration_date = attribs.get('expirationDate')
         if expiration_date is None:
-            message = 'Expiration date of resumtion token could not be checked: expirationDate not supported.'
-            self.results.append(('ResumptionTokenExp', 'unverified', message))
+            message = 'resumptionToken should contain expirationDate information.'
+            self.results.append(('ResumptionTokenExp', 'recommendation', message))
             return
         try:
             parsed_expiration_date = dateparser.parse(expiration_date)
         except ValueError:
-            message = 'Expiration date of resumtion token could not be checked: invalid date format: %s' % expiration_date
+            message = 'Expiration date of resumption token could not be checked: invalid date format: %s' % expiration_date
             self.results.append(('ResumptionTokenExp', 'error', message))
             return
         tz = parsed_expiration_date.tzinfo
@@ -484,11 +484,57 @@ class Validator(object):
         delta = parsed_expiration_date - now
         delta_hours = delta.seconds / 60 / 60
         if delta_hours < 23:
-            message = 'Resumtion token should last 24 hours. This one lasts: %d' % delta_hours
+            message = 'Resumption token should last at least 23 hours. This one lasts: %d hour(s).' % delta_hours
             self.results.append(('ResumptionTokenExp', 'recommendation', message))
             return
-        message = 'Resumtion token lasts %d hours.' % delta_hours
+        message = 'Resumption token lasts %d hours.' % delta_hours
         self.results.append(('ResumptionTokenExp', 'ok', message))
+        return
+
+
+    def check_resumption_list_size(self, verb, metadataPrefix='oai_dc'):
+        """Make sure that the list size resumption token is reasonable."""
+        try:
+            remote = request_oai(self.base_url, 'ListRecords', method=self.method,
+                                metadataPrefix='oai_dc')
+            tree = etree.parse(remote)
+        except Exception, exc:
+            message = 'completeListSize of resumption token could not be checked: %s' % unicode(exc)
+            self.results.append(('ResumptionTokenList', 'unverified', message))
+            return
+        resumption_token = tree.find('.//' + self.oai + 'resumptionToken')
+        if resumption_token is None:
+            message = 'completeListSize of resumption token could not be checked: No token found'
+            self.results.append(('ResumptionTokenList', 'unverified', message))
+            return
+        if verb == 'ListRecords':
+            element = 'record'
+        elif verb == 'ListIdentifiers':
+            element = 'header'
+        records = tree.findall('.//' + self.oai + element)
+        if records is None:
+            number_of_records = 0
+        else:
+            number_of_records = len(records)
+        attribs = resumption_token.attrib
+        list_size = attribs.get('completeListSize')
+        if list_size is None:
+            message = 'resumptionToken should contain completeListSize information.'
+            self.results.append(('ResumptionTokenList', 'recommendation', message))
+            return
+        try:
+            list_size = int(list_size)
+        except ValueError, exc:
+            message = 'Invalid format of completeListSize: %s' % exc
+            self.results.append(('ResumptionTokenList', 'error', message))
+            return
+        if list_size <= number_of_records:
+            message = 'Value of completeListSize (%d) makes no sense. Records in first batch: %d' % (list_size, 
+                                                                                            number_of_records)
+            self.results.append(('ResumptionTokenList', 'error', message))
+            return
+        message = 'completeListSize: %d records.' % list_size
+        self.results.append(('ResumptionTokenList', 'ok', message))
         return
 
     def check_deleting_strategy(self):
@@ -569,7 +615,8 @@ class Validator(object):
         self.validate_XML('ListRecords')
         self.validate_XML('ListIdentifiers')
         self.validate_XML('ListSets')
-        self.check_resumption_expiration_date('ListRecords', 'oai_dc')
+        self.check_resumption_expiration_date('ListRecords')
+        self.check_resumption_list_size('ListRecords')
         self.reasonable_batch_size('ListRecords')
         self.reasonable_batch_size('ListIdentifiers')
         self.dc_language_ISO()
