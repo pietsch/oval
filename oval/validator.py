@@ -432,7 +432,7 @@ class Validator(object):
                 continue
             for language_element in language_elements:
                 try:
-                    language = language_element.text
+                    language = language_element.text.lower()
                 except AttributeError:
                     continue
                 if language in ISO_639_3_CODES:
