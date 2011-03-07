@@ -57,18 +57,6 @@ DC_DATE_FULL = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([+-]\d{2}:\d{2}
 # URLs of Repositories indexed in BASE 
 BASE_URLS = pickle.load(open(os.path.join(DATA_PATH, 'BASE_URLS.pickle')))
 
-        
-# Helper functions
-
-# def get_random_record(base_url, metadataPrefix='oai_dc'):
-#     """Shortcut for getting a random record in oai_dc."""
-#     remote = request_oai(base_url, 'ListRecords', metadataPrefix=metadataPrefix)
-#     tree = etree.parse(remote)
-#     records = tree.findall('.//' + self.oai + 'record')
-#     random_record = random.sample(records, 1)[0]
-#     return random_record
-
-
 class Validator(object):
     """Validates OAI-OMH interfaces."""
 
@@ -79,17 +67,6 @@ class Validator(object):
             self.base_url = base_url
         else:
             self.base_url = base_url + '?'
-
-        # Intended as first test if the OAI-PMH interface is reachable.
-        # However, some repos do not implement a request without verbs.
-        
-        # try: 
-        #     urllib2.urlopen(self.base_url)
-        # except Exception:
-        #     raise
-        
-        # Protocol Version
-        
         self.protocol_version = self.get_protocol_version()
         self.oai_namespace = OAI_NAMESPACE % self.protocol_version
         self.oai = "{%s}" % self.oai_namespace
@@ -127,7 +104,7 @@ class Validator(object):
                 self.admin_email = tree.find('.//' + self.oai + 'adminEmail').text
             except AttributeError, exc:
                 self.admin_email = '[No email provided or not found.]'
-        except (URLError, XMLSyntaxError), exc:
+        except Exception, exc:
             message = 'Could not fetch general repository information: %s' % unicode(exc)
             self.results.append(('RepositoryInformation', 'error', message))
             self.repository_name = '[Could not fetch name.]'
@@ -151,7 +128,7 @@ class Validator(object):
         try:
             remote = urllib2.urlopen(self.base_url + 'verb=Identify')
             xml_string = remote.read()
-        except URLError, exc:
+        except Exception, exc:
             message = "Could not determine protocol version: %s Assuming 2.0" % unicode(exc)
             self.results.append(('ProtocolVersion', 'error', message))
             return '2.0'
@@ -346,7 +323,7 @@ class Validator(object):
             remote = request_oai(self.base_url, 'ListRecords', method=self.method,
                                 metadataPrefix='oai_dc')
             tree = etree.parse(remote)
-        except (URLError, XMLSyntaxError), exc:
+        except Exception, exc:
             message = 'Minimal DC elements could not be checked: %s' % unicode(exc)
             self.results.append(('MinimalDC', 'unverified', message))
             return
@@ -383,7 +360,7 @@ class Validator(object):
             remote = request_oai(self.base_url, 'ListRecords', method=self.method,
                                 metadataPrefix='oai_dc')
             tree = etree.parse(remote)
-        except (URLError, XMLSyntaxError), exc:
+        except Exception, exc:
             message = 'dc:date ISO 8601 conformance could not be checked: %s' % unicode(exc)
             self.results.append(('ISO8601', 'unverified', message))
             return
@@ -414,7 +391,7 @@ class Validator(object):
             remote = request_oai(self.base_url, 'ListRecords', method=self.method,
                                 metadataPrefix='oai_dc')
             tree = etree.parse(remote)
-        except (URLError, XMLSyntaxError), exc:
+        except Exception, exc:
             message = 'dc:language conformance to ISO 639 could not be checked: %s' % unicode(exc)
             self.results.append(('ISO639', 'unverified', message))
             return
@@ -569,7 +546,7 @@ class Validator(object):
             remote = request_oai(self.base_url, 'ListRecords', method=self.method,
                                 metadataPrefix='oai_dc')
             tree = etree.parse(remote)
-        except (URLError, XMLSyntaxError), exc:
+        except Exception, exc:
             message = "Could not check URL in dc:identifier: %s" % unicode(exc)
             self.results.append(('DCIdentifierURL', 'unverified', message))
             return
