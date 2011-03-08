@@ -57,13 +57,25 @@ DC_DATE_FULL = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([+-]\d{2}:\d{2}
 # URLs of Repositories indexed in BASE 
 BASE_URLS = pickle.load(open(os.path.join(DATA_PATH, 'BASE_URLS.pickle')))
 
+def is_double_encoded(string):
+    """Check if a unicode string is double encoded UTF8"""
+    try:
+         cleaned = string.encode('raw_unicode_escape').decode('utf8')
+    except UnicodeDecodeError:
+        return False
+    return cleaned != string
+
+
 class Validator(object):
     """Validates OAI-OMH interfaces."""
 
     def __init__(self, base_url):
         super(Validator, self).__init__()
         self.results = []
-        if base_url.endswith('?'):
+        base_url = base_url.strip()
+        if '?verb=' in base_url:
+            self.base_url = base_url[:base_url.index('verb=')]
+        elif base_url.endswith('?'):
             self.base_url = base_url
         else:
             self.base_url = base_url + '?'
@@ -109,7 +121,7 @@ class Validator(object):
             self.results.append(('RepositoryInformation', 'error', message))
             self.repository_name = '[Could not fetch name.]'
             self.admin_email = '[Could not fetch email.]'
-        
+    
     
     def check_HTTP_methods(self, methods):
         """Make sure server supports GET and POST as required. Return supported
@@ -125,6 +137,7 @@ class Validator(object):
         return methods
     
     def get_protocol_version(self):
+        """Determine the version of OAI-PMH (should be 2.0)."""
         try:
             remote = urllib2.urlopen(self.base_url + 'verb=Identify')
             xml_string = remote.read()
@@ -453,7 +466,8 @@ class Validator(object):
         try:
             parsed_expiration_date = dateparser.parse(expiration_date)
         except ValueError:
-            message = 'Expiration date of resumption token could not be checked: invalid date format: %s' % expiration_date
+            message = ('Expiration date of resumption token could not be checked: '
+                       'invalid date format: %s' % expiration_date)
             self.results.append(('ResumptionTokenExp', 'error', message))
             return
         tz = parsed_expiration_date.tzinfo
@@ -461,7 +475,8 @@ class Validator(object):
         delta = parsed_expiration_date - now
         delta_hours = delta.seconds / 60 / 60
         if delta_hours < 23:
-            message = 'Resumption token should last at least 23 hours. This one lasts: %d hour(s).' % delta_hours
+            message = ('Resumption token should last at least 23 hours. '
+                      'This one lasts: %d hour(s).' % delta_hours)
             self.results.append(('ResumptionTokenExp', 'recommendation', message))
             return
         message = 'Resumption token lasts %d hours.' % delta_hours
@@ -555,6 +570,12 @@ class Validator(object):
             message = "Could not check URL in dc:identifier: No records."
             self.results.append(('DCIdentifierURL', 'unverified', message))
             return
+        identifiers = tree.findall('.//' + DC + 'identifier')
+        if len(identifiers) == 0:
+            message = ("Could not check for absolute URLs in dc:identifiers: " 
+                       "No dc:identifiers found.")
+            self.results.append(('DCIdentifierURL', 'unverified', message))
+            return
         found_abs_urls = set()
         for record in records:
             abs_url = False
@@ -584,6 +605,22 @@ class Validator(object):
             return
         message = "Tested records contain absolute URLs in dc:identifier."
         self.results.append(('DCIdentifierURL', 'ok', message))
+    
+    def check_double_utf8(self):
+        try:
+            remote = request_oai(self.base_url, 'ListRecords', method=self.method,
+                                metadataPrefix='oai_dc')
+            tree = etree.parse(remote)
+        except Exception, exc:
+            return
+        descriptions = tree.findall('.//' + DC + 'description')
+        description_texts = [d.text for d in descriptions if d is not None]
+        
+        for text in description_texts:
+            if is_double_encoded(text):
+                message = "Possibly detected double-encoded UTF-8."
+                self.results.append(('DoubleUTF8', 'warning', message))
+                return
                 
     def check_driver_conformity(self):
         """Run checks required for conformance to DRIVER guidelines"""
@@ -602,6 +639,7 @@ class Validator(object):
         self.incremental_harvesting('ListRecords')
         self.dc_identifier_abs()
         self.check_deleting_strategy()
+        self.check_double_utf8()
         self.indexed_in_BASE()
 
 def main():
