@@ -58,7 +58,7 @@ DC_DATE_FULL = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([+-]\d{2}:\d{2}
 BASE_URLS = pickle.load(open(os.path.join(DATA_PATH, 'BASE_URLS.pickle')))
 
 def is_double_encoded(string):
-    """Check if a unicode string is double encoded UTF8"""
+    """Check if a unicode string is double encoded UTF8."""
     try:
          cleaned = string.encode('raw_unicode_escape').decode('utf8')
     except UnicodeDecodeError:
@@ -618,7 +618,7 @@ class Validator(object):
         
         for text in description_texts:
             if is_double_encoded(text):
-                message = "Possibly detected double-encoded UTF-8."
+                message = "Possibly detected double-encoded UTF-8 characters."
                 self.results.append(('DoubleUTF8', 'warning', message))
                 return
                 
