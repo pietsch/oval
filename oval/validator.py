@@ -63,6 +63,8 @@ def is_double_encoded(string):
          cleaned = string.encode('raw_unicode_escape').decode('utf8')
     except UnicodeDecodeError:
         return False
+    if '\\u' in cleaned:
+        return False
     return cleaned != string
 
 
