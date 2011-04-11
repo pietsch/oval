@@ -26,7 +26,7 @@ from lxml import etree
 from lxml.etree import XMLSyntaxError
 from lxml.etree import DocumentInvalid
 
-from oval.harvester import request_oai
+from oval.harvester import configure_record_iterator, configure_request, get_protocol_version, check_HTTP_methods, get_repository_information
 from oval import DATA_PATH
 from oval import ISO_639_3_CODES, ISO_639_2B_CODES
 from oval import ISO_639_2T_CODES, ISO_639_1_CODES
@@ -57,6 +57,12 @@ DC_DATE_FULL = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([+-]\d{2}:\d{2}
 # URLs of Repositories indexed in BASE 
 BASE_URLS = pickle.load(open(os.path.join(DATA_PATH, 'BASE_URLS.pickle')))
 
+
+schema_file = os.path.join(DATA_PATH, 'combined.xsd')
+schema_tree = etree.parse(schema_file)
+SCHEMA = etree.XMLSchema(schema_tree)
+
+
 def is_double_encoded(string):
     """Check if a unicode string is double encoded UTF8."""
     try:
@@ -67,123 +73,97 @@ def is_double_encoded(string):
         return False
     return cleaned != string
 
+def normalize_base_url(url):
+    url = url.strip()
+    if '?verb=' in url:
+        url = url[:url.index('verb=')]
+    elif url.endswith('?'):
+        pass
+    else:
+        url = url + '?'
+    return url
+    
+def draw_sample(iterator, size):
+    items = []
+    for item in iterator:
+        items.append(item)
+        if len(items) == size:
+            break
+    return items
 
 class Validator(object):
     """Validates OAI-OMH interfaces."""
 
-    def __init__(self, base_url):
+    def __init__(self, base_url, timeout=None):
         super(Validator, self).__init__()
+        
+        self.base_url = normalize_base_url(base_url)
+        self.timeout = timeout
         self.results = []
-        base_url = base_url.strip()
-        if '?verb=' in base_url:
-            self.base_url = base_url[:base_url.index('verb=')]
-        elif base_url.endswith('?'):
-            self.base_url = base_url
+        
+        #HTTP-Method
+        supported_methods = check_HTTP_methods(self.base_url)
+        if len(supported_methods) == 2:
+            message = 'Server supports both GET and POST requests.'
+            self.results.append(('HTTPMethod', 'ok', message))
+            self.method = 'POST'
+        elif len(supported_methods) == 1:
+            supported_method = supported_methods[0]
+            message = 'Server accepts only %s requests.' % supported_method
+            self.results.append(('HTTPMethod', 'error', message))
+            self.method = supported_method
         else:
-            self.base_url = base_url + '?'
-        self.protocol_version = self.get_protocol_version()
+            message = ('Could not determine supported HTTP methods. '
+                      'Falling back to GET.')
+            self.results.append(('HTTPMethod', 'warning', message))
+            self.method = 'GET'
+        
+        self.protocol_version = get_protocol_version(self.base_url, self.method)
+        if self.protocol_version is None:
+            message = 'Could not determine OAI-PMH protocol version; assuming 2.0'
+            self.results.append(('ProtocolVersion', 'warning', message))
+            self.protocol_version = '2.0'
+        elif self.protocol_version == '1.0' or self.protocol_version == '1.1':
+            message = 'OAI-PMH version %s is deprecated. Consider updating to 2.0.' % self.protocol_version
+            self.results.append(('ProtocolVersion', 'recommendation', message))
+        elif self.protocol_version == '2.0':
+            message = 'OAI-PMH version is 2.0'
+            self.results.append(('ProtocolVersion', 'ok', message))
+        else:
+            message = 'Undefined OAI-PMH protocol version: %s Assuming 2.0' % self.protocol_version
+            self.results.append(('ProtocolVersion', 'error', message))
+            self.protocol_version = '2.0'
+            
+        #Preconfigure RecordIterator class for this repo
+        self.RecordIterator = configure_record_iterator(self.base_url, self.protocol_version, self.method, self.timeout)
         self.oai_namespace = OAI_NAMESPACE % self.protocol_version
         self.oai = "{%s}" % self.oai_namespace
         
-        
-        methods = ['POST', 'GET']
-        #HTTP-Method
-        try:
-            supported_methods = self.check_HTTP_methods(methods)
-            if len(supported_methods) == 2:
-                message = 'Server supports both GET and POST requests.'
-                self.results.append(('HTTPMethod', 'ok', message))
-                self.method = 'POST'
-            elif len(supported_methods) == 1:
-                supported_method = supported_methods[0]
-                message = 'Server accepts only %s requests.' % supported_method
-                self.results.append(('HTTPMethod', 'error', message))
-                self.method = supported_method
-        except Exception, exc:
-            message = ('Could not determine supported HTTP methods: %s '
-                      'Falling back to GET.' % unicode(exc))
-            self.results.append(('HTTPMethod', 'error', message))
-            self.method = 'GET'
-        
-                
         # General Repository Information
-        try:
-            remote = request_oai(self.base_url, 'Identify', method=self.method)
-            tree = etree.parse(remote)
-            try:
-                self.repository_name = tree.find('.//' + self.oai + 'repositoryName').text
-            except AttributeError, exc:
-                self.repository_name = '[No name provided or not found.]'
-            try:
-                self.admin_email = tree.find('.//' + self.oai + 'adminEmail').text
-            except AttributeError, exc:
-                self.admin_email = '[No email provided or not found.]'
-        except Exception, exc:
-            message = 'Could not fetch general repository information: %s' % unicode(exc)
-            self.results.append(('RepositoryInformation', 'error', message))
-            self.repository_name = '[Could not fetch name.]'
-            self.admin_email = '[Could not fetch email.]'
+        self.repository_name, self.admin_email = get_repository_information(self.base_url,
+                                                    self.method)
+        
+        self.request_oai = configure_request(self.base_url, self.method, timeout=self.timeout)
     
-    
-    def check_HTTP_methods(self, methods):
-        """Make sure server supports GET and POST as required. Return supported
-        method(s).
-        """
-        methods = methods
-        for method in methods:
-            remote = request_oai(self.base_url, verb='Identify', method=method)
-            tree = etree.parse(remote)
-            error = tree.find('.//' + self.oai + 'error')
-            if error is not None:
-                methods.remove(method)
-        return methods
-    
-    def get_protocol_version(self):
-        """Determine the version of OAI-PMH (should be 2.0)."""
-        try:
-            remote = urllib2.urlopen(self.base_url + 'verb=Identify')
-            xml_string = remote.read()
-        except Exception, exc:
-            message = "Could not determine protocol version: %s Assuming 2.0" % unicode(exc)
-            self.results.append(('ProtocolVersion', 'error', message))
-            return '2.0'
-        m = VERSION_PATTERN.search(xml_string)
-        if m:
-            version = m.group(1)
-            if version == '2.0':
-                message = "OAI-PMH protocol version is 2.0"
-                self.results.append(('ProtocolVersion', 'ok', message))
-            else:
-                message = "OAI-PMH protocol version %s is deprecated. Consider updating to 2.0" % version
-                self.results.append(('ProtocolVersion', 'warning', message))
-            return version
-        else:
-            message = "OAI-PMH protocol version not found. Falling back to 2.0"
-            self.results.append(('ProtocolVersion', 'warning', message))
-            return '2.0'
-            
-            
     def indexed_in_BASE(self):
         """Check if the repository is indexed in BASE."""
         netloc = urlparse(self.base_url).netloc
         if netloc in BASE_URLS:
             message = "Repository content is indexed by BASE."
         else:
-            message = "Repository content is indexed by BASE."
+            message = "Repository content is currently not indexed by BASE."
         self.results.append(('BASEIndex', 'info', message))
-    
+
+
     def check_identify_base_url(self):
         """Compare field baseURL in Identify response with self.base_url."""
-        
         # In version 2.0, the requestURL field was renamed to requestURL
         if self.protocol_version == '2.0':
             request_tagname = 'request'
         else:
             request_tagname = 'requestURL'
-        
         try:
-            remote = request_oai(self.base_url, 'Identify', method=self.method)
-            tree = etree.parse(remote)
+            tree = self.request_oai(verb='Identify')
             request_field = tree.find('.//' + self.oai + request_tagname)
         except Exception, exc:
             message = "Could not compare basic URLs: %s" % unicode(exc)
@@ -200,37 +180,33 @@ class Validator(object):
         else:
             message = 'Requests seem to be redirected to: "%s"' % request_url
             self.results.append(('BaseURLMatch', 'warning', message))
+            
 
     def validate_XML(self, verb, metadataPrefix='oai_dc', identifier=None):
         """Check if XML returned for OAI-PMH verb is well-formed and valid."""
         try:
             if verb in ('Identify', 'ListSets', 'ListMetadataFormats'):
-                remote = request_oai(self.base_url, verb, method=self.method)
+                tree = self.request_oai(verb=verb)
 
             elif verb in ('ListRecords', 'ListIdentifiers', 'GetRecord'):
-                remote = request_oai(self.base_url, verb, method=self.method,
-                                        metadataPrefix=metadataPrefix, 
+                tree = self.request_oai(verb=verb, metadataPrefix=metadataPrefix,
                                         identifier=identifier)
-        except Exception, exc:
-            message = 'XML response of %s could not be checked: %s' % (verb,
-                                                                    unicode(exc))
-            self.results.append(('%sXML' % verb, 'unverified', message))
-            return
-        try:        
-            tree = etree.parse(remote)
         except XMLSyntaxError, exc:
             message = '%s response is not well-formed: %s' % (verb, unicode(exc))
             self.results.append(('%sXML' % verb, 'error', message))
             return
-        schema_file = os.path.join(DATA_PATH, 'combined.xsd')
-        schema_tree = etree.parse(schema_file)
-        schema = etree.XMLSchema(schema_tree)
+        except Exception, exc:
+            message = 'XML response of %s could not be validated: %s' % (verb,
+                                                                    unicode(exc))
+            self.results.append(('%sXML' % verb, 'unverified', message))
+            return
         try:
-            schema.assertValid(tree)
+            SCHEMA.assertValid(tree)
             self.results.append(('%sXML' % verb, 'ok', '%s response well-formed and valid.' % verb))
         except DocumentInvalid, exc:
             message = "%s response well-formed but invalid: %s" % (verb, unicode(exc))
             self.results.append(('%sXML' % verb, 'error', message))
+
 
     def reasonable_batch_size(self, verb, metadataPrefix='oai_dc', 
                             min_batch_size=100, max_batch_size=500):
@@ -238,28 +214,18 @@ class Validator(object):
         ListRecords/ListIdentifiers request. Default values are set according
         to the DRIVER guidelines.
         """
-        if verb == 'ListRecords':
-            element = 'record'
-        if verb == 'ListIdentifiers':
-            element = 'header'
-        
         try:
-            remote = request_oai(self.base_url, verb, method=self.method,
-                                metadataPrefix=metadataPrefix)
-            tree = etree.parse(remote)
+            riter = self.RecordIterator(verb, metadataPrefix, deleted=True)
         except Exception, exc:
             message = "%s batch size could not be checked: %s" % (verb, unicode(exc))
             self.results.append(('%sBatch' % verb, 'unverified', message))
             return
-        
-        resumption_token = tree.find('.//' + self.oai + 'resumptionToken')
-        if resumption_token is None:
+        # resumptionToken found? (= are there multiple batches?)
+        if riter.token is None:
             message = ('%s batch size could not be checked: Only one batch.' % verb)
             self.results.append(('%sBatch' % verb, 'unverified', message))
             return
-        
-        records = tree.findall('.//' + self.oai + element)
-        batch_size = len(records)
+        batch_size = len(riter.record_list)
         
         if batch_size == 0:
             message = ('%s batch size could not be checked: No records.' % verb)
@@ -277,18 +243,13 @@ class Validator(object):
             message = '%s batch size is %d.' % (verb, batch_size)
             self.results.append(('%sBatch' % verb, 'ok', message))
 
-    def incremental_harvesting(self, verb, metadataPrefix='oai_dc'):
-        """Check if server supports incremental harvesting by date.
+
+    def incremental_harvesting(self, verb, metadataPrefix='oai_dc', sample_size=200):
+        """Check if server supports incremental harvesting using full time granularity.
         """
-        if verb == 'ListRecords':
-            element = 'record'
-        if verb == 'ListIdentifiers':
-            element = 'header'
         try:
-            remote = request_oai(self.base_url, verb, method=self.method,
-                                metadataPrefix=metadataPrefix)
-            tree = etree.parse(remote)
-            records = tree.findall('.//' + self.oai + element)
+            riter = self.RecordIterator(verb, metadataPrefix)
+            records = draw_sample(riter, sample_size)
         except Exception, exc:
             message = "Incremental harvesting could not be checked: %s" % unicode(exc)
             self.results.append(('Incremental%s' % verb, 'unverified', 
@@ -302,51 +263,47 @@ class Validator(object):
         reference_record = random.sample(records, 1)[0]
         reference_datestamp_elem = reference_record.find('.//' + self.oai + 'datestamp')
         if reference_datestamp_elem is None:
-            message = "Incremental harvesting could not be checked: No no datestamp."
+            message = "Incremental harvesting could not be checked: No datestamp."
             self.results.append(('Incremental%s' % verb, 'unverified', 
                                 message))
             return
-        reference_datestamp = reference_datestamp_elem.text[:10]
+        reference_datestamp = reference_datestamp_elem.text
+        reference_date = dateparser.parse(reference_datestamp)
         try:
-            remote = request_oai(self.base_url, verb, method=self.method,
-                                metadataPrefix=metadataPrefix, 
+            riter = self.RecordIterator(verb, metadataPrefix=metadataPrefix, 
                                 _from=reference_datestamp,
                                 until=reference_datestamp)
-            tree = etree.parse(remote)
         except Exception, exc:
             message = "Incremental harvesting could not be checked: %s" % unicode(exc)
             self.results.append(('Incremental%s' % verb, 'unverified', 
                                 message))
             return
-        records = tree.findall('.//' + self.oai + element)
-        if len(records) == 0:
+        if len(riter.record_list) == 0:
             self.results.append(('Incremental%s' % verb, 'error', 
                                 'No incremental harvesting of %s.' % verb))
             return
-        test_record = random.sample(records, 1)[0]
-        test_datestamp = test_record.find('.//' + self.oai + 'datestamp').text[:10]
-        if test_datestamp == reference_datestamp:
-            self.results.append(('Incremental%s' % verb, 'ok', 
+        for record in riter:
+            test_datestamp = record.find('.//' + self.oai + 'datestamp').text
+            test_date = dateparser.parse(test_datestamp)
+            if test_date != reference_date:
+                self.results.append(('Incremental%s' % verb, 'error', 
+                                        'No incremental harvesting of %s.' % verb))
+                return
+        self.results.append(('Incremental%s' % verb, 'ok', 
                                 'Incremental harvesting of %s works.' % verb))
-        else:
-            self.results.append(('Incremental%s' % verb, 'error', 
-                                'No incremental harvesting of %s.' % verb))
 
-    def minimal_dc_elements(self, minimal_set=MINIMAL_DC_SET):
+    def minimal_dc_elements(self, minimal_set=MINIMAL_DC_SET, sample_size=50):
         """Check for the minimal set of Dublin Core elements."""
         try:
-            remote = request_oai(self.base_url, 'ListRecords', method=self.method,
-                                metadataPrefix='oai_dc')
-            tree = etree.parse(remote)
+            riter = self.RecordIterator(verb='ListRecords', metadataPrefix='oai_dc', deleted=False)
+            records = draw_sample(riter, sample_size)
         except Exception, exc:
             message = 'Minimal DC elements could not be checked: %s' % unicode(exc)
             self.results.append(('MinimalDC', 'unverified', message))
             return
-        records = tree.findall('.//' + self.oai + 'record')
         if len(records) == 0:
             message = "Minimal DC elements could not be checked: No records."
-            self.results.append(('MinimalDC', 'unverified', 
-                                message))
+            self.results.append(('MinimalDC', 'unverified', message))
             return
         for record in records:
             oai_id = record.find('.//' + self.oai + 'identifier').text
@@ -366,20 +323,18 @@ class Validator(object):
         self.results.append(('MinimalDC', 'ok', 'Minimal DC elements (%s) are '
                             'present.' % ', '.join(minimal_set)))
 
-    def dc_date_ISO(self):
+    def dc_date_ISO(self, sample_size=50):
         """Check if dc:date conforms to ISO 8601 (matches YYYY-MM-DD). Return
         True if OK or a dictionary of record IDs and invalid dates if not.
         """
-        err_dict = {}
         try:
-            remote = request_oai(self.base_url, 'ListRecords', method=self.method,
-                                metadataPrefix='oai_dc')
-            tree = etree.parse(remote)
+            riter = self.RecordIterator(verb='ListRecords', metadataPrefix='oai_dc', deleted=False)
+            records = draw_sample(riter, sample_size)
         except Exception, exc:
             message = 'dc:date ISO 8601 conformance could not be checked: %s' % unicode(exc)
             self.results.append(('ISO8601', 'unverified', message))
             return
-        records = tree.findall('.//' + self.oai + 'record')
+        
         if len(records) == 0:
             message = "dc:date ISO 8601 conformance could not be checked: No records."
             self.results.append(('ISO8601', 'unverified', 
@@ -388,6 +343,9 @@ class Validator(object):
         for record in records:
             oai_id = record.find('.//' + self.oai + 'identifier').text
             dc_dates = record.findall('.//' + DC + 'date')
+            dc_dates = filter(lambda d: d.text is not None, dc_dates)
+            if dc_dates == []:
+                continue
             for dc_date in dc_dates:
                 date = dc_date.text
                 if not (DC_DATE_YEAR.match(date) or
@@ -400,26 +358,29 @@ class Validator(object):
                     return
         self.results.append(('ISO8601', 'ok', 'dc:dates conform to ISO 8601.'))
 
-    def dc_language_ISO(self):
+
+    def dc_language_ISO(self, sample_size=50):
         """Check if dc:language conforms to ISO 639-3/-2B/-2T/-1."""
         try:
-            remote = request_oai(self.base_url, 'ListRecords', method=self.method,
-                                metadataPrefix='oai_dc')
-            tree = etree.parse(remote)
+            riter = self.RecordIterator(verb='ListRecords', metadataPrefix='oai_dc')
+            records = draw_sample(riter, sample_size)
         except Exception, exc:
             message = 'dc:language conformance to ISO 639 could not be checked: %s' % unicode(exc)
             self.results.append(('ISO639', 'unverified', message))
             return
-        language_elements = tree.findall('.//' + DC + 'language')
-        if language_elements == []:
+        if len(records) == 0:
+            message = 'dc:language conformance to ISO 639 could not be checked: no records.'
+            self.results.append(('ISO639', 'unverified', message))
+            return
+        if filter(lambda r: r.findall('.//' + DC + 'language') != [], records) == []:
             message = ('dc:language conformance to ISO 639 could not be checked: '
                       'No dc:language element found.')
             self.results.append(('ISO639', 'unverified', message))
             return
-        records = tree.findall('.//' + self.oai + 'record')
         for record in records:
             oai_id = record.find('.//' + self.oai + 'identifier').text
             language_elements = record.findall('.//' + DC + 'language')
+            language_elements = filter(lambda e: e.text is not None, language_elements)
             if language_elements == []:
                 continue
             for language_element in language_elements:
@@ -444,12 +405,10 @@ class Validator(object):
         self.results.append(('ISO639', 'ok', message))
 
     def check_resumption_expiration_date(self, verb, metadataPrefix='oai_dc'):
-        """Make sure that the resumption token is good for at least 24h.
+        """Make sure that the resumption token is good for at least 23h.
         """
         try:
-            remote = request_oai(self.base_url, 'ListRecords', method=self.method,
-                                metadataPrefix='oai_dc')
-            tree = etree.parse(remote)
+            tree = self.request_oai(verb=verb, metadataPrefix=metadataPrefix)
         except Exception, exc:
             message = 'Expiration date of resumption token could not be checked: %s' % unicode(exc)
             self.results.append(('ResumptionTokenExp', 'unverified', message))
@@ -485,13 +444,10 @@ class Validator(object):
         self.results.append(('ResumptionTokenExp', 'ok', message))
         return
 
-
     def check_resumption_list_size(self, verb, metadataPrefix='oai_dc'):
         """Make sure that the list size resumption token is reasonable."""
         try:
-            remote = request_oai(self.base_url, 'ListRecords', method=self.method,
-                                metadataPrefix='oai_dc')
-            tree = etree.parse(remote)
+            tree = self.request_oai(verb='ListRecords', metadataPrefix='oai_dc')
         except Exception, exc:
             message = 'completeListSize of resumption token could not be checked: %s' % unicode(exc)
             self.results.append(('ResumptionTokenList', 'unverified', message))
@@ -501,15 +457,8 @@ class Validator(object):
             message = 'completeListSize of resumption token could not be checked: No token found'
             self.results.append(('ResumptionTokenList', 'unverified', message))
             return
-        if verb == 'ListRecords':
-            element = 'record'
-        elif verb == 'ListIdentifiers':
-            element = 'header'
-        records = tree.findall('.//' + self.oai + element)
-        if records is None:
-            number_of_records = 0
-        else:
-            number_of_records = len(records)
+        riter = self.RecordIterator(verb=verb, metadataPrefix=metadataPrefix)
+        number_of_records = len(riter.record_list)
         attribs = resumption_token.attrib
         list_size = attribs.get('completeListSize')
         if list_size is None:
@@ -534,8 +483,7 @@ class Validator(object):
     def check_deleting_strategy(self):
         """Report the deleting strategy; recommend persistent or transient"""
         try:
-            remote = request_oai(self.base_url, 'Identify', method=self.method)
-            tree = etree.parse(remote)
+            tree = self.request_oai(verb='Identify')
             deleting_strategy = tree.find('.//' + self.oai + 'deletedRecord').text
         except AttributeError:
             message = "Deleting strategy could not be checked: deletedRecord element not found."
@@ -557,27 +505,22 @@ class Validator(object):
             report = 'error'
         self.results.append(('DeletingStrategy', report, message))
 
-    def dc_identifier_abs(self):
+    def dc_identifier_abs(self, sample_size=50):
         """Check if dc:identifier contains an absolute URL."""
         try:
-            remote = request_oai(self.base_url, 'ListRecords', method=self.method,
-                                metadataPrefix='oai_dc')
-            tree = etree.parse(remote)
+            riter = self.RecordIterator(verb='ListRecords', metadataPrefix='oai_dc')
+            records = draw_sample(riter, sample_size)
         except Exception, exc:
             message = "Could not check URL in dc:identifier: %s" % unicode(exc)
             self.results.append(('DCIdentifierURL', 'unverified', message))
             return
-        records = tree.findall('.//' + self.oai + 'record')
         if len(records) == 0:
             message = "Could not check URL in dc:identifier: No records."
             self.results.append(('DCIdentifierURL', 'unverified', message))
             return
-        identifiers = tree.findall('.//' + DC + 'identifier')
-        if len(identifiers) == 0:
-            message = ("Could not check for absolute URLs in dc:identifiers: " 
-                       "No dc:identifiers found.")
-            self.results.append(('DCIdentifierURL', 'unverified', message))
-            return
+            # message = ("Could not check for absolute URLs in dc:identifiers: " 
+            #            "No dc:identifiers found.")
+            # self.results.append(('DCIdentifierURL', 'unverified', message))
         found_abs_urls = set()
         for record in records:
             abs_url = False
@@ -610,9 +553,7 @@ class Validator(object):
     
     def check_double_utf8(self):
         try:
-            remote = request_oai(self.base_url, 'ListRecords', method=self.method,
-                                metadataPrefix='oai_dc')
-            tree = etree.parse(remote)
+            tree = self.request_oai(verb='ListRecords', metadataPrefix='oai_dc')
         except Exception, exc:
             return
         descriptions = tree.findall('.//' + DC + 'description')
