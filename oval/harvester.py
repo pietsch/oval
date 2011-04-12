@@ -144,6 +144,20 @@ def get_protocol_version(base_url, method):
         version = m.group(1)
         return version
 
+def get_granularity(base_url, method):
+    granularity_re = re.compile(r'<granularity>(.*?)</granularity>')
+    try:
+        response = fetch_data(base_url, method, {'verb': 'Identify'})
+    except Exception:
+        return None
+    m = granularity_re.search(response)
+    if m is not None:
+        granularity = m.group(1)
+        if granularity == 'YYYY-MM-DDThh:mm:ssZ':
+            return 'full'
+        elif granularity == 'YYYY-MM-DD':
+            return 'day'
+
 def check_HTTP_methods(base_url):
     """Make sure server supports GET and POST as required. Return supported
     methods in list or [].
@@ -197,6 +211,8 @@ def configure_record_iterator(base_url, protocol_version, HTTPmethod, timeout=No
             
             #OAI namespace
             self.oai_namespace = OAI % self.protocol_version
+            # record list
+            self.record_list = []
             # resumptionToken
             self.token = None
             if self.verb == 'ListRecords':
@@ -207,10 +223,11 @@ def configure_record_iterator(base_url, protocol_version, HTTPmethod, timeout=No
             self.request_oai = configure_request(self.base_url, self.HTTPmethod, self.timeout)
             #Fetch the initial portion
             response = self.request_oai(verb=self.verb, 
-                                metadataPrefix=self.metadataPrefix,
-                                _from=self._from, until=self.until)
-            self.token = self._get_resumption_token(response)
+                        metadataPrefix=self.metadataPrefix,
+                        _from=self._from, until=self.until,
+                        resumptionToken=self.token)
             self.record_list = self._get_records(response)
+            self.token = self._get_resumption_token(response)
 
         def __iter__(self):
             return self
@@ -238,16 +255,22 @@ def configure_record_iterator(base_url, protocol_version, HTTPmethod, timeout=No
                 records = filter(self._is_not_deleted, records)
             return records
         
-        def next(self):
-            if (len(self.record_list) == 0 and self.token is None):
-                raise StopIteration
-            elif len(self.record_list) == 0:
+        def _next_batch(self):
+            while self.record_list == []:
                 response = self.request_oai(verb=self.verb, 
                             metadataPrefix=self.metadataPrefix,
                             _from=self._from, until=self.until,
                             resumptionToken=self.token)
                 self.record_list = self._get_records(response)
                 self.token = self._get_resumption_token(response)
+                if self.record_list == [] and self.token == None:
+                    raise StopIteration
+        
+        def next(self):
+            if (len(self.record_list) == 0 and self.token is None):
+                raise StopIteration
+            elif len(self.record_list) == 0:
+                self._next_batch()
             current_record = self.record_list.pop()
             return current_record
     return RecordIterator
