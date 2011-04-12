@@ -254,23 +254,23 @@ class Validator(object):
             records = draw_sample(riter, sample_size)
         except Exception, exc:
             message = "Incremental harvesting (%s granularity) of %s could not be checked: %s" % (granularity, verb, unicode(exc))
-            self.results['Incremental%s' % verb] =  ('unverified', message)
+            self.results['Incremental%s%s' % (verb, granularity)] =  ('unverified', message)
             return
         if len(records) == 0:
             message = "Incremental harvesting (%s granularity) of %s could not be checked: No records." % (granularity, verb)
-            self.results['Incremental%s' % verb] = ('unverified', message)
+            self.results['Incremental%s%s' % (verb, granularity)] = ('unverified', message)
             return
         reference_record = random.sample(records, 1)[0]
         reference_datestamp_elem = reference_record.find('.//' + self.oai + 'datestamp')
         if reference_datestamp_elem is None:
             message = "Incremental harvesting (%s granularity) of %s could not be checked: No datestamp." % (granularity, verb)
-            self.results['Incremental%s' % verb] = ('unverified', message)
+            self.results['Incremental%s%s' % (verb, granularity)] = ('unverified', message)
             return
         reference_datestamp = reference_datestamp_elem.text
         if not (DC_DATE_DAY.match(reference_datestamp) or DC_DATE_FULL.match(reference_datestamp)):
             message = ("Incremental harvesting (%s granularity) of %s could not be checked: "
                         "Incorrect format for datestamp: %s." % (granularity, verb, datestamp))
-            self.results['Incremental%s' % verb] = ('unverified', message)
+            self.results['Incremental%s%s' % (verb, granularity)] = ('unverified', message)
             return
         if granularity == 'day':
             reference_datestamp = reference_datestamp[:10]
@@ -281,10 +281,10 @@ class Validator(object):
                                 until=reference_datestamp)
         except Exception, exc:
             message = "Incremental harvesting (%s granularity) of %s could not be checked: %s" % (granularity, verb, unicode(exc))
-            self.results['Incremental%s' % verb] = ('unverified', message)
+            self.results['Incremental%s%s' % (verb, granularity)] = ('unverified', message)
             return
         if len(riter.record_list) == 0:
-            self.results['Incremental%s' % verb] = ('error', 
+            self.results['Incremental%s%s' % (verb, granularity)] = ('error', 
                                 'No incremental harvesting (%s granularity) of %s: ' 
                                 'Harvest for reference date %s returned no records.'% (granularity, verb, reference_datestamp))
             return
@@ -294,12 +294,12 @@ class Validator(object):
                 test_datestamp = test_datestamp[:10]
             test_date = dateparser.parse(test_datestamp)
             if test_date != reference_date:
-                self.results['Incremental%s' % verb] = ('error', 
+                self.results['Incremental%s%s' % (verb, granularity)] = ('error', 
                                     'No incremental (%s granularity) harvesting of %s. ' 
                                     'Harvest for reference date %s returned record with date %s.' % (granularity, verb, 
                                     reference_datestamp, test_datestamp))
                 return
-        self.results['Incremental%s' % verb] = ('ok', 
+        self.results['Incremental%s%s' % (verb, granularity)] = ('ok', 
             'Incremental harvesting (%s granularity) of %s works.' % (granularity, verb))
 
     def minimal_dc_elements(self, minimal_set=MINIMAL_DC_SET, sample_size=50):
