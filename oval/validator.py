@@ -269,7 +269,7 @@ class Validator(object):
         reference_datestamp = reference_datestamp_elem.text
         if not (DC_DATE_DAY.match(reference_datestamp) or DC_DATE_FULL.match(reference_datestamp)):
             message = ("Incremental harvesting (%s granularity) of %s could not be checked: "
-                        "Incorrect format for datestamp: %s." % (granularity, verb, datestamp))
+                        "Incorrect format for datestamp: %s." % (granularity, verb, reference_datestamp))
             self.results['Incremental%s%s' % (verb, granularity)] = ('unverified', message)
             return
         if granularity == 'day':
