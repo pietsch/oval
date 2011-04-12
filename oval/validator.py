@@ -26,7 +26,7 @@ from lxml import etree
 from lxml.etree import XMLSyntaxError
 from lxml.etree import DocumentInvalid
 
-from oval.harvester import configure_record_iterator, configure_request, get_protocol_version, check_HTTP_methods, get_repository_information
+from oval.harvester import configure_record_iterator, configure_request, get_protocol_version, check_HTTP_methods, get_repository_information, get_granularity
 from oval import DATA_PATH
 from oval import ISO_639_3_CODES, ISO_639_2B_CODES
 from oval import ISO_639_2T_CODES, ISO_639_1_CODES
@@ -42,8 +42,7 @@ MINIMAL_DC_SET = set([
                 'title',
                 'date',
                 'type',
-                'creator'
-])
+                'creator'])
 
 # Protocol Version Scheme
 VERSION_PATTERN = re.compile(r'<protocolVersion>(.*?)</protocolVersion>')
@@ -142,7 +141,10 @@ class Validator(object):
         # General Repository Information
         self.repository_name, self.admin_email = get_repository_information(self.base_url,
                                                     self.method)
-        
+        self.granularity = get_granularity(self.base_url, self.method)
+        if self.granularity is None:
+            # Fall back to day granularity in case it could not be determined
+            self.granularity = 'day'
         self.request_oai = configure_request(self.base_url, self.method, timeout=self.timeout)
     
     def indexed_in_BASE(self):
@@ -244,53 +246,67 @@ class Validator(object):
             self.results.append(('%sBatch' % verb, 'ok', message))
 
 
-    def incremental_harvesting(self, verb, metadataPrefix='oai_dc', sample_size=200):
-        """Check if server supports incremental harvesting using full time granularity.
+    def incremental_harvesting(self, verb, granularity, metadataPrefix='oai_dc', sample_size=50):
+        """Check if server supports incremental harvesting using time granularity.
         """
         try:
             riter = self.RecordIterator(verb, metadataPrefix)
             records = draw_sample(riter, sample_size)
         except Exception, exc:
-            message = "Incremental harvesting could not be checked: %s" % unicode(exc)
+            message = "Incremental harvesting (%s granularity) of %s could not be checked: %s" % (granularity, verb, unicode(exc))
             self.results.append(('Incremental%s' % verb, 'unverified', 
                                 message))
             return
         if len(records) == 0:
-            message = "Incremental harvesting could not be checked: No records."
+            message = "Incremental harvesting (%s granularity) of %s could not be checked: No records." % (granularity, verb)
             self.results.append(('Incremental%s' % verb, 'unverified', 
                                 message))
             return
         reference_record = random.sample(records, 1)[0]
         reference_datestamp_elem = reference_record.find('.//' + self.oai + 'datestamp')
         if reference_datestamp_elem is None:
-            message = "Incremental harvesting could not be checked: No datestamp."
+            message = "Incremental harvesting (%s granularity) of %s could not be checked: No datestamp." % (granularity, verb)
             self.results.append(('Incremental%s' % verb, 'unverified', 
                                 message))
             return
         reference_datestamp = reference_datestamp_elem.text
+        if not (DC_DATE_DAY.match(reference_datestamp) or DC_DATE_FULL.match(reference_datestamp)):
+            message = ("Incremental harvesting (%s granularity) of %s could not be checked: "
+                        "Incorrect format for datestamp: %s." % (granularity, verb, datestamp))
+            self.results.append(('Incremental%s' % verb, 'unverified', 
+                                message))
+            return
+        if granularity == 'day':
+            reference_datestamp = reference_datestamp[:10]
         reference_date = dateparser.parse(reference_datestamp)
         try:
             riter = self.RecordIterator(verb, metadataPrefix=metadataPrefix, 
                                 _from=reference_datestamp,
                                 until=reference_datestamp)
         except Exception, exc:
-            message = "Incremental harvesting could not be checked: %s" % unicode(exc)
+            message = "Incremental harvesting (%s granularity) of %s could not be checked: %s" % (granularity, verb, unicode(exc))
             self.results.append(('Incremental%s' % verb, 'unverified', 
                                 message))
             return
         if len(riter.record_list) == 0:
             self.results.append(('Incremental%s' % verb, 'error', 
-                                'No incremental harvesting of %s.' % verb))
+                                'No incremental harvesting (%s granularity) of %s: ' 
+                                'Harvest for reference date %s returned no records.'% (granularity, verb, reference_datestamp)))
             return
         for record in riter:
             test_datestamp = record.find('.//' + self.oai + 'datestamp').text
+            if granularity == 'day':
+                test_datestamp = test_datestamp[:10]
             test_date = dateparser.parse(test_datestamp)
             if test_date != reference_date:
                 self.results.append(('Incremental%s' % verb, 'error', 
-                                        'No incremental harvesting of %s.' % verb))
+                                    'No incremental (%s granularity) harvesting of %s. ' 
+                                    'Harvest for reference date %s returned record with date %s.' % (granularity, verb, 
+                                                                                reference_datestamp, test_datestamp)))
                 return
         self.results.append(('Incremental%s' % verb, 'ok', 
-                                'Incremental harvesting of %s works.' % verb))
+                                'Incremental harvesting (%s granularity) of %s works.' % (granularity, verb)))
+
 
     def minimal_dc_elements(self, minimal_set=MINIMAL_DC_SET, sample_size=50):
         """Check for the minimal set of Dublin Core elements."""
@@ -324,9 +340,7 @@ class Validator(object):
                             'present.' % ', '.join(minimal_set)))
 
     def dc_date_ISO(self, sample_size=50):
-        """Check if dc:date conforms to ISO 8601 (matches YYYY-MM-DD). Return
-        True if OK or a dictionary of record IDs and invalid dates if not.
-        """
+        """Check if dc:date conforms to ISO 8601 (matches YYYY-MM-DD)."""
         try:
             riter = self.RecordIterator(verb='ListRecords', metadataPrefix='oai_dc', deleted=False)
             records = draw_sample(riter, sample_size)
@@ -334,17 +348,18 @@ class Validator(object):
             message = 'dc:date ISO 8601 conformance could not be checked: %s' % unicode(exc)
             self.results.append(('ISO8601', 'unverified', message))
             return
-        
         if len(records) == 0:
             message = "dc:date ISO 8601 conformance could not be checked: No records."
             self.results.append(('ISO8601', 'unverified', 
                                 message))
             return
+        no_date = []; wrong_date = []; correct_date = []
         for record in records:
             oai_id = record.find('.//' + self.oai + 'identifier').text
             dc_dates = record.findall('.//' + DC + 'date')
             dc_dates = filter(lambda d: d.text is not None, dc_dates)
             if dc_dates == []:
+                no_date.append(record)
                 continue
             for dc_date in dc_dates:
                 date = dc_date.text
@@ -352,10 +367,10 @@ class Validator(object):
                         DC_DATE_MONTH.match(date) or
                         DC_DATE_DAY.match(date) or 
                         DC_DATE_FULL.match(date)):
-                    message = ('Found a record (%s) where the content of dc:date '
-                        'is not conforming to ISO 8601: "%s"' % (oai_id, date))
-                    self.results.append(('ISO8601', 'warning', message))
-                    return
+                        wrong_date.append(record)
+                    # message = ('Found a record (%s) where the content of dc:date '
+                    #     'is not conforming to ISO 8601: "%s"' % (oai_id, date))
+                    # self.results.append(('ISO8601', 'warning', message))
         self.results.append(('ISO8601', 'ok', 'dc:dates conform to ISO 8601.'))
 
 
@@ -372,6 +387,7 @@ class Validator(object):
             message = 'dc:language conformance to ISO 639 could not be checked: no records.'
             self.results.append(('ISO639', 'unverified', message))
             return
+        
         if filter(lambda r: r.findall('.//' + DC + 'language') != [], records) == []:
             message = ('dc:language conformance to ISO 639 could not be checked: '
                       'No dc:language element found.')
@@ -579,7 +595,11 @@ class Validator(object):
         self.dc_language_ISO()
         self.dc_date_ISO()
         self.minimal_dc_elements()
-        self.incremental_harvesting('ListRecords')
+        if self.granularity == 'day':
+            self.incremental_harvesting('ListRecords', 'day')
+        elif self.granularity == 'full':
+            self.incremental_harvesting('ListRecords', 'day')
+            self.incremental_harvesting('ListRecords', 'full')
         self.dc_identifier_abs()
         self.check_deleting_strategy()
         self.check_double_utf8()
