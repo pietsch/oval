@@ -98,39 +98,39 @@ class Validator(object):
         
         self.base_url = normalize_base_url(base_url)
         self.timeout = timeout
-        self.results = []
+        self.results = {}
         
         #HTTP-Method
         supported_methods = check_HTTP_methods(self.base_url)
         if len(supported_methods) == 2:
             message = 'Server supports both GET and POST requests.'
-            self.results.append(('HTTPMethod', 'ok', message))
+            self.results['HTTPMethod'] = ('ok', message)
             self.method = 'POST'
         elif len(supported_methods) == 1:
             supported_method = supported_methods[0]
             message = 'Server accepts only %s requests.' % supported_method
-            self.results.append(('HTTPMethod', 'error', message))
+            self.results['HTTPMethod'] = ('error', message)
             self.method = supported_method
         else:
             message = ('Could not determine supported HTTP methods. '
                       'Falling back to GET.')
-            self.results.append(('HTTPMethod', 'warning', message))
+            self.results['HTTPMethod'] =  ('warning', message)
             self.method = 'GET'
         
         self.protocol_version = get_protocol_version(self.base_url, self.method)
         if self.protocol_version is None:
             message = 'Could not determine OAI-PMH protocol version; assuming 2.0'
-            self.results.append(('ProtocolVersion', 'warning', message))
+            self.results['ProtocolVersion'] =  ('warning', message)
             self.protocol_version = '2.0'
         elif self.protocol_version == '1.0' or self.protocol_version == '1.1':
             message = 'OAI-PMH version %s is deprecated. Consider updating to 2.0.' % self.protocol_version
-            self.results.append(('ProtocolVersion', 'recommendation', message))
+            self.results['ProtocolVersion'] = ('recommendation', message)
         elif self.protocol_version == '2.0':
             message = 'OAI-PMH version is 2.0'
-            self.results.append(('ProtocolVersion', 'ok', message))
+            self.results['ProtocolVersion'] = ('ok', message)
         else:
             message = 'Undefined OAI-PMH protocol version: %s Assuming 2.0' % self.protocol_version
-            self.results.append(('ProtocolVersion', 'error', message))
+            self.results['ProtocolVersion'] =  ('error', message)
             self.protocol_version = '2.0'
             
         #Preconfigure RecordIterator class for this repo
@@ -154,7 +154,7 @@ class Validator(object):
             message = "Repository content is indexed by BASE."
         else:
             message = "Repository content is currently not indexed by BASE."
-        self.results.append(('BASEIndex', 'info', message))
+        self.results['BASEIndex'] = ('info', message)
 
 
     def check_identify_base_url(self):
@@ -169,19 +169,19 @@ class Validator(object):
             request_field = tree.find('.//' + self.oai + request_tagname)
         except Exception, exc:
             message = "Could not compare basic URLs: %s" % unicode(exc)
-            self.results.append(('BaseURLMatch', 'unverified', message))
+            self.results['BaseURLMatch'] = ('unverified', message)
             return
         if request_field is None:
             message = 'Could not compare basic URLs: field "%s" not found.' % request_tagname
-            self.results.append(('BaseURLMatch', 'unverified', message))
+            self.results['BaseURLMatch']= ('unverified', message)
             return
         request_url = request_field.text
         if self.base_url[:-1] == request_url:
             message = 'URL in "%s" (Identify) matches provided basic URL.' % request_tagname
-            self.results.append(('BaseURLMatch', 'ok', message))
+            self.results['BaseURLMatch'] = ('ok', message)
         else:
             message = 'Requests seem to be redirected to: "%s"' % request_url
-            self.results.append(('BaseURLMatch', 'warning', message))
+            self.results['BaseURLMatch'] = ('warning', message)
             
 
     def validate_XML(self, verb, metadataPrefix='oai_dc', identifier=None):
@@ -195,19 +195,19 @@ class Validator(object):
                                         identifier=identifier)
         except XMLSyntaxError, exc:
             message = '%s response is not well-formed: %s' % (verb, unicode(exc))
-            self.results.append(('%sXML' % verb, 'error', message))
+            self.results['%sXML' % verb] = ('error', message)
             return
         except Exception, exc:
             message = 'XML response of %s could not be validated: %s' % (verb,
                                                                     unicode(exc))
-            self.results.append(('%sXML' % verb, 'unverified', message))
+            self.results['%sXML' % verb] = ('unverified', message)
             return
         try:
             SCHEMA.assertValid(tree)
-            self.results.append(('%sXML' % verb, 'ok', '%s response well-formed and valid.' % verb))
+            self.results['%sXML' % verb] = ('ok', '%s response well-formed and valid.' % verb)
         except DocumentInvalid, exc:
             message = "%s response well-formed but invalid: %s" % (verb, unicode(exc))
-            self.results.append(('%sXML' % verb, 'error', message))
+            self.results['%sXML' % verb] = ('error', message)
 
 
     def reasonable_batch_size(self, verb, metadataPrefix='oai_dc', 
@@ -220,30 +220,30 @@ class Validator(object):
             riter = self.RecordIterator(verb, metadataPrefix, deleted=True)
         except Exception, exc:
             message = "%s batch size could not be checked: %s" % (verb, unicode(exc))
-            self.results.append(('%sBatch' % verb, 'unverified', message))
+            self.results['%sBatch' % verb] = ('unverified', message)
             return
         # resumptionToken found? (= are there multiple batches?)
         if riter.token is None:
             message = ('%s batch size could not be checked: Only one batch.' % verb)
-            self.results.append(('%sBatch' % verb, 'unverified', message))
+            self.results['%sBatch' % verb] = ('unverified', message)
             return
         batch_size = len(riter.record_list)
         
         if batch_size == 0:
             message = ('%s batch size could not be checked: No records.' % verb)
-            self.results.append(('%sBatch' % verb, 'unverified', message))
+            self.results['%sBatch' % verb] = ('unverified', message)
             return
         if batch_size < min_batch_size:
             message = ('%s batch size too small (%d), should be at least %d.' %
                        (verb, batch_size, min_batch_size))
-            self.results.append(('%sBatch' % verb, 'recommendation', message))
+            self.results['%sBatch' % verb] = ('recommendation', message)
         elif batch_size > max_batch_size:
             message = ('%s batch size is too large (%d), should be at most %d.' %
                        (verb, batch_size, max_batch_size))
-            self.results.append(('%sBatch' % verb, 'recommendation', message))
+            self.results['%sBatch' % verb] = ('recommendation', message)
         else:
             message = '%s batch size is %d.' % (verb, batch_size)
-            self.results.append(('%sBatch' % verb, 'ok', message))
+            self.results['%sBatch' % verb] = ('ok', message)
 
 
     def incremental_harvesting(self, verb, granularity, metadataPrefix='oai_dc', sample_size=50):
@@ -254,27 +254,23 @@ class Validator(object):
             records = draw_sample(riter, sample_size)
         except Exception, exc:
             message = "Incremental harvesting (%s granularity) of %s could not be checked: %s" % (granularity, verb, unicode(exc))
-            self.results.append(('Incremental%s' % verb, 'unverified', 
-                                message))
+            self.results['Incremental%s' % verb] =  ('unverified', message)
             return
         if len(records) == 0:
             message = "Incremental harvesting (%s granularity) of %s could not be checked: No records." % (granularity, verb)
-            self.results.append(('Incremental%s' % verb, 'unverified', 
-                                message))
+            self.results['Incremental%s' % verb] = ('unverified', message)
             return
         reference_record = random.sample(records, 1)[0]
         reference_datestamp_elem = reference_record.find('.//' + self.oai + 'datestamp')
         if reference_datestamp_elem is None:
             message = "Incremental harvesting (%s granularity) of %s could not be checked: No datestamp." % (granularity, verb)
-            self.results.append(('Incremental%s' % verb, 'unverified', 
-                                message))
+            self.results['Incremental%s' % verb] = ('unverified', message)
             return
         reference_datestamp = reference_datestamp_elem.text
         if not (DC_DATE_DAY.match(reference_datestamp) or DC_DATE_FULL.match(reference_datestamp)):
             message = ("Incremental harvesting (%s granularity) of %s could not be checked: "
                         "Incorrect format for datestamp: %s." % (granularity, verb, datestamp))
-            self.results.append(('Incremental%s' % verb, 'unverified', 
-                                message))
+            self.results['Incremental%s' % verb] = ('unverified', message)
             return
         if granularity == 'day':
             reference_datestamp = reference_datestamp[:10]
@@ -285,13 +281,12 @@ class Validator(object):
                                 until=reference_datestamp)
         except Exception, exc:
             message = "Incremental harvesting (%s granularity) of %s could not be checked: %s" % (granularity, verb, unicode(exc))
-            self.results.append(('Incremental%s' % verb, 'unverified', 
-                                message))
+            self.results['Incremental%s' % verb] = ('unverified', message)
             return
         if len(riter.record_list) == 0:
-            self.results.append(('Incremental%s' % verb, 'error', 
+            self.results['Incremental%s' % verb] = ('error', 
                                 'No incremental harvesting (%s granularity) of %s: ' 
-                                'Harvest for reference date %s returned no records.'% (granularity, verb, reference_datestamp)))
+                                'Harvest for reference date %s returned no records.'% (granularity, verb, reference_datestamp))
             return
         for record in riter:
             test_datestamp = record.find('.//' + self.oai + 'datestamp').text
@@ -299,14 +294,13 @@ class Validator(object):
                 test_datestamp = test_datestamp[:10]
             test_date = dateparser.parse(test_datestamp)
             if test_date != reference_date:
-                self.results.append(('Incremental%s' % verb, 'error', 
+                self.results['Incremental%s' % verb] = ('error', 
                                     'No incremental (%s granularity) harvesting of %s. ' 
                                     'Harvest for reference date %s returned record with date %s.' % (granularity, verb, 
-                                                                                reference_datestamp, test_datestamp)))
+                                    reference_datestamp, test_datestamp))
                 return
-        self.results.append(('Incremental%s' % verb, 'ok', 
-                                'Incremental harvesting (%s granularity) of %s works.' % (granularity, verb)))
-
+        self.results['Incremental%s' % verb] = ('ok', 
+            'Incremental harvesting (%s granularity) of %s works.' % (granularity, verb))
 
     def minimal_dc_elements(self, minimal_set=MINIMAL_DC_SET, sample_size=50):
         """Check for the minimal set of Dublin Core elements."""
@@ -315,11 +309,11 @@ class Validator(object):
             records = draw_sample(riter, sample_size)
         except Exception, exc:
             message = 'Minimal DC elements could not be checked: %s' % unicode(exc)
-            self.results.append(('MinimalDC', 'unverified', message))
+            self.results['MinimalDC'] = ('unverified', message)
             return
         if len(records) == 0:
             message = "Minimal DC elements could not be checked: No records."
-            self.results.append(('MinimalDC', 'unverified', message))
+            self.results['MinimalDC'], ('unverified', message)
             return
         for record in records:
             oai_id = record.find('.//' + self.oai + 'identifier').text
@@ -331,13 +325,13 @@ class Validator(object):
                 message = ("Records should at least contain the DC "
                           "elements: %s. Found a record (%s) missing the "
                           "following DC element(s): %s.")
-                self.results.append(('MinimalDC', 'warning', message % (
+                self.results['MinimalDC'] = ('warning', message % (
                                                          ", ".join(minimal_set),
                                                           oai_id, 
-                                                        ", ".join(intersect))))
+                                                        ", ".join(intersect)))
                 return
-        self.results.append(('MinimalDC', 'ok', 'Minimal DC elements (%s) are '
-                            'present.' % ', '.join(minimal_set)))
+        self.results['MinimalDC'] = ('ok', 'Minimal DC elements (%s) are '
+                            'present.' % ', '.join(minimal_set))
 
     def dc_date_ISO(self, sample_size=50):
         """Check if dc:date conforms to ISO 8601 (matches YYYY-MM-DD)."""
@@ -346,12 +340,12 @@ class Validator(object):
             records = draw_sample(riter, sample_size)
         except Exception, exc:
             message = 'dc:date ISO 8601 conformance could not be checked: %s' % unicode(exc)
-            self.results.append(('ISO8601', 'unverified', message))
+            self.results['ISO8601'] = ('unverified', message)
             return
         if len(records) == 0:
             message = "dc:date ISO 8601 conformance could not be checked: No records."
-            self.results.append(('ISO8601', 'unverified', 
-                                message))
+            self.results['ISO8601'] = ('unverified', 
+                                message)
             return
         no_date = []; wrong_date = []; correct_date = []
         for record in records:
@@ -371,7 +365,7 @@ class Validator(object):
                     # message = ('Found a record (%s) where the content of dc:date '
                     #     'is not conforming to ISO 8601: "%s"' % (oai_id, date))
                     # self.results.append(('ISO8601', 'warning', message))
-        self.results.append(('ISO8601', 'ok', 'dc:dates conform to ISO 8601.'))
+        self.results['ISO8601'] = ('ok', 'dc:dates conform to ISO 8601.')
 
 
     def dc_language_ISO(self, sample_size=50):
@@ -381,17 +375,17 @@ class Validator(object):
             records = draw_sample(riter, sample_size)
         except Exception, exc:
             message = 'dc:language conformance to ISO 639 could not be checked: %s' % unicode(exc)
-            self.results.append(('ISO639', 'unverified', message))
+            self.results['ISO639'] = ('unverified', message)
             return
         if len(records) == 0:
             message = 'dc:language conformance to ISO 639 could not be checked: no records.'
-            self.results.append(('ISO639', 'unverified', message))
+            self.results['ISO639'] = ('unverified', message)
             return
         
         if filter(lambda r: r.findall('.//' + DC + 'language') != [], records) == []:
             message = ('dc:language conformance to ISO 639 could not be checked: '
                       'No dc:language element found.')
-            self.results.append(('ISO639', 'unverified', message))
+            self.results['ISO639'] = ('unverified', message)
             return
         for record in records:
             oai_id = record.find('.//' + self.oai + 'identifier').text
@@ -415,10 +409,10 @@ class Validator(object):
                 else:
                     message = ('dc:language should conform to ISO 639, '
                             'found "%s" (%s).' % (language, oai_id))
-                    self.results.append(('ISO639', 'recommendation', message))
+                    self.results['ISO639'] = ('recommendation', message)
                     return  
         message = 'dc:language conforms to ISO %s.' % iso
-        self.results.append(('ISO639', 'ok', message))
+        self.results['ISO639'] = ('ok', message)
 
     def check_resumption_expiration_date(self, verb, metadataPrefix='oai_dc'):
         """Make sure that the resumption token is good for at least 23h.
@@ -427,25 +421,25 @@ class Validator(object):
             tree = self.request_oai(verb=verb, metadataPrefix=metadataPrefix)
         except Exception, exc:
             message = 'Expiration date of resumption token could not be checked: %s' % unicode(exc)
-            self.results.append(('ResumptionTokenExp', 'unverified', message))
+            self.results['ResumptionTokenExp'] = ('unverified', message)
             return
         resumption_token = tree.find('.//' + self.oai + 'resumptionToken')
         if resumption_token is None:
             message = 'Expiration date of resumption token could not be checked: No token found'
-            self.results.append(('ResumptionTokenExp', 'unverified', message))
+            self.results['ResumptionTokenExp'] = ('unverified', message)
             return
         attribs = resumption_token.attrib
         expiration_date = attribs.get('expirationDate')
         if expiration_date is None:
             message = 'resumptionToken should contain expirationDate information.'
-            self.results.append(('ResumptionTokenExp', 'recommendation', message))
+            self.results['ResumptionTokenExp'] = ('recommendation', message)
             return
         try:
             parsed_expiration_date = dateparser.parse(expiration_date)
         except ValueError:
             message = ('Expiration date of resumption token could not be checked: '
                        'invalid date format: %s' % expiration_date)
-            self.results.append(('ResumptionTokenExp', 'error', message))
+            self.results['ResumptionTokenExp'] = ('error', message)
             return
         tz = parsed_expiration_date.tzinfo
         now = datetime.now(tz)
@@ -454,10 +448,10 @@ class Validator(object):
         if delta_hours < 23:
             message = ('Resumption token should last at least 23 hours. '
                       'This one lasts: %d hour(s).' % delta_hours)
-            self.results.append(('ResumptionTokenExp', 'recommendation', message))
+            self.results['ResumptionTokenExp'] = ('recommendation', message)
             return
         message = 'Resumption token lasts %d hours.' % delta_hours
-        self.results.append(('ResumptionTokenExp', 'ok', message))
+        self.results['ResumptionTokenExp'] = ('ok', message)
         return
 
     def check_resumption_list_size(self, verb, metadataPrefix='oai_dc'):
@@ -466,12 +460,12 @@ class Validator(object):
             tree = self.request_oai(verb='ListRecords', metadataPrefix='oai_dc')
         except Exception, exc:
             message = 'completeListSize of resumption token could not be checked: %s' % unicode(exc)
-            self.results.append(('ResumptionTokenList', 'unverified', message))
+            self.results['ResumptionTokenList'] = ('unverified', message)
             return
         resumption_token = tree.find('.//' + self.oai + 'resumptionToken')
         if resumption_token is None:
             message = 'completeListSize of resumption token could not be checked: No token found'
-            self.results.append(('ResumptionTokenList', 'unverified', message))
+            self.results['ResumptionTokenList'] = ('unverified', message)
             return
         riter = self.RecordIterator(verb=verb, metadataPrefix=metadataPrefix)
         number_of_records = len(riter.record_list)
@@ -479,21 +473,21 @@ class Validator(object):
         list_size = attribs.get('completeListSize')
         if list_size is None:
             message = 'resumptionToken should contain completeListSize information.'
-            self.results.append(('ResumptionTokenList', 'recommendation', message))
+            self.results['ResumptionTokenList'] = ('recommendation', message)
             return
         try:
             list_size = int(list_size)
         except ValueError, exc:
             message = 'Invalid format of completeListSize: %s' % exc
-            self.results.append(('ResumptionTokenList', 'error', message))
+            self.results['ResumptionTokenList'] = ('error', message)
             return
         if list_size <= number_of_records:
             message = 'Value of completeListSize (%d) makes no sense. Records in first batch: %d' % (list_size, 
                                                                                             number_of_records)
-            self.results.append(('ResumptionTokenList', 'error', message))
+            self.results['ResumptionTokenList'] = ('error', message)
             return
         message = 'completeListSize: %d records.' % list_size
-        self.results.append(('ResumptionTokenList', 'ok', message))
+        self.results['ResumptionTokenList'] = ('ok', message)
         return
 
     def check_deleting_strategy(self):
@@ -503,11 +497,11 @@ class Validator(object):
             deleting_strategy = tree.find('.//' + self.oai + 'deletedRecord').text
         except AttributeError:
             message = "Deleting strategy could not be checked: deletedRecord element not found."
-            self.results.append(('DeletingStrategy', 'unverified', message))
+            self.results['DeletingStrategy'] = ('unverified', message)
             return
         except Exception, exc:
             message = "Deleting strategy could not be checked: %s" % unicode(exc)
-            self.results.append(('DeletingStrategy', 'unverified', message))
+            self.results['DeletingStrategy'] = ('unverified', message)
             return
         if deleting_strategy == 'no':
             message = (u'Deleting strategy is "no" – recommended is persistent or '
@@ -519,7 +513,7 @@ class Validator(object):
         else:
             message = 'Undefined deleting strategy: "%s"' % deleting_strategy
             report = 'error'
-        self.results.append(('DeletingStrategy', report, message))
+        self.results['DeletingStrategy'] = (report, message)
 
     def dc_identifier_abs(self, sample_size=50):
         """Check if dc:identifier contains an absolute URL."""
@@ -528,11 +522,11 @@ class Validator(object):
             records = draw_sample(riter, sample_size)
         except Exception, exc:
             message = "Could not check URL in dc:identifier: %s" % unicode(exc)
-            self.results.append(('DCIdentifierURL', 'unverified', message))
+            self.results['DCIdentifierURL'] = ('unverified', message)
             return
         if len(records) == 0:
             message = "Could not check URL in dc:identifier: No records."
-            self.results.append(('DCIdentifierURL', 'unverified', message))
+            self.results['DCIdentifierURL'] = ('unverified', message)
             return
             # message = ("Could not check for absolute URLs in dc:identifiers: " 
             #            "No dc:identifiers found.")
@@ -545,7 +539,7 @@ class Validator(object):
             if identifiers == []:
                 message = ("Found at least one record missing dc:identifier: %s"
                             % oai_id)
-                self.results.append(('DCIdentifierURL', 'warning', message))
+                self.results['DCIdentifierURL'] = ('warning', message)
                 return
             for identifier_element in identifiers:
                 identifier = identifier_element.text
@@ -557,15 +551,15 @@ class Validator(object):
             if abs_url == False:
                 message = ("Found at least one record missing an absolute URL "
                            "in dc:identifier: %s" % oai_id)
-                self.results.append(('DCIdentifierURL', 'warning', message))
+                self.results['DCIdentifierURL'] = ('warning', message)
                 return
         if len(records) > 1 and len(found_abs_urls) == 1:
             message = ("All records have the same URL in dc:identifier: %s"
                         % list(found_abs_urls)[0])
-            self.results.append(('DCIdentifierURL', 'warning', message))
+            self.results['DCIdentifierURL'] = ('warning', message)
             return
         message = "Tested records contain absolute URLs in dc:identifier."
-        self.results.append(('DCIdentifierURL', 'ok', message))
+        self.results['DCIdentifierURL'] = ('ok', message)
     
     def check_double_utf8(self):
         try:
@@ -578,7 +572,7 @@ class Validator(object):
         for text in description_texts:
             if is_double_encoded(text):
                 message = "Possibly detected double-encoded UTF-8 characters."
-                self.results.append(('DoubleUTF8', 'warning', message))
+                self.results['DoubleUTF8'] = ('warning', message)
                 return
                 
     def check_driver_conformity(self):
