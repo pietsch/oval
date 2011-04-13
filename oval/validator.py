@@ -313,7 +313,7 @@ class Validator(object):
             return
         if len(records) == 0:
             message = "Minimal DC elements could not be checked: No records."
-            self.results['MinimalDC'], ('unverified', message)
+            self.results['MinimalDC'] = ('unverified', message)
             return
         for record in records:
             oai_id = record.find('.//' + self.oai + 'identifier').text
