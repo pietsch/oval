@@ -381,37 +381,30 @@ class Validator(object):
             message = 'dc:language conformance to ISO 639 could not be checked: no records.'
             self.results['ISO639'] = ('unverified', message)
             return
-        
-        if filter(lambda r: r.findall('.//' + DC + 'language') != [], records) == []:
-            message = ('dc:language conformance to ISO 639 could not be checked: '
-                      'No dc:language element found.')
+        language_elements = reduce(lambda x,y: x+y, [r.findall('.//' + DC + 'language') 
+                                                    for r in records])
+        languages = [e.text for e in language_elements if e.text is not None]
+        if languages == []:
+            message = ('dc:language conformance to ISO 639 could not be checked: ' 
+                        'no dc:language element found')
             self.results['ISO639'] = ('unverified', message)
             return
-        for record in records:
-            oai_id = record.find('.//' + self.oai + 'identifier').text
-            language_elements = record.findall('.//' + DC + 'language')
-            language_elements = filter(lambda e: e.text is not None, language_elements)
-            if language_elements == []:
-                continue
-            for language_element in language_elements:
-                try:
-                    language = language_element.text.lower()
-                except AttributeError:
-                    continue
-                if language in ISO_639_3_CODES:
-                    iso = '639-3'
-                elif language in ISO_639_2B_CODES:
-                    iso = '639-2B'
-                elif language in ISO_639_2T_CODES:
-                    iso = '639-2T'
-                elif language in ISO_639_1_CODES:
-                    iso = '639-1'
-                else:
-                    message = ('dc:language should conform to ISO 639, '
-                            'found "%s" (%s).' % (language, oai_id))
-                    self.results['ISO639'] = ('recommendation', message)
-                    return  
-        message = 'dc:language conforms to ISO %s.' % iso
+        supported_isos = set()
+        for language in languages:
+            if language in ISO_639_3_CODES:
+                supported_isos.add('639-3')
+            elif language in ISO_639_2B_CODES:
+                supported_isos.add('639-2B')
+            elif language in ISO_639_2T_CODES:
+                supported_isos.add('639-2T')
+            elif language in ISO_639_1_CODES:
+                supported_isos.add('639-1')
+            else:
+                message = ('dc:language should conform to ISO 639, '
+                        'found "%s"' % language)
+                self.results['ISO639'] = ('recommendation', message)
+                return  
+        message = 'dc:language elements conform to ISO %s.' % ", ".join(supported_isos)
         self.results['ISO639'] = ('ok', message)
 
     def check_resumption_expiration_date(self, verb, metadataPrefix='oai_dc'):
