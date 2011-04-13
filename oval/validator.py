@@ -561,13 +561,13 @@ class Validator(object):
         message = "Tested records contain absolute URLs in dc:identifier."
         self.results['DCIdentifierURL'] = ('ok', message)
     
-    def check_double_utf8(self):
+    def check_double_utf8(self, sample_size=50):
         try:
             tree = self.request_oai(verb='ListRecords', metadataPrefix='oai_dc')
         except Exception, exc:
             return
         descriptions = tree.findall('.//' + DC + 'description')
-        description_texts = [d.text for d in descriptions if d is not None]
+        description_texts = [d.text for d in descriptions if d.text is not None]
         
         for text in description_texts:
             if is_double_encoded(text):
