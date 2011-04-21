@@ -612,6 +612,7 @@ class Validator(object):
         self.dc_identifier_abs()
         self.check_deleting_strategy()
         self.check_double_utf8()
+        self.check_handle()
         self.indexed_in_BASE()
 
 def main():
