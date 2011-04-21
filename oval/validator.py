@@ -287,17 +287,22 @@ class Validator(object):
                                 'No incremental harvesting (%s granularity) of %s: ' 
                                 'Harvest for reference date %s returned no records.'% (granularity, verb, reference_datestamp))
             return
-        for record in riter:
-            test_datestamp = record.find('.//' + self.oai + 'datestamp').text
-            if granularity == 'day':
-                test_datestamp = test_datestamp[:10]
-            test_date = dateparser.parse(test_datestamp)
-            if test_date != reference_date:
-                self.results['Incremental%s%s' % (verb, granularity)] = ('error', 
-                                    'No incremental (%s granularity) harvesting of %s. ' 
-                                    'Harvest for reference date %s returned record with date %s.' % (granularity, verb, 
-                                    reference_datestamp, test_datestamp))
-                return
+        try:
+            for record in riter:
+                test_datestamp = record.find('.//' + self.oai + 'datestamp').text
+                if granularity == 'day':
+                    test_datestamp = test_datestamp[:10]
+                test_date = dateparser.parse(test_datestamp)
+                if test_date != reference_date:
+                    self.results['Incremental%s%s' % (verb, granularity)] = ('error', 
+                                        'No incremental (%s granularity) harvesting of %s. ' 
+                                        'Harvest for reference date %s returned record with date %s.' % (granularity, verb, 
+                                        reference_datestamp, test_datestamp))
+                    return
+        except Exception, exc:
+            message = "Incremental harvesting (%s granularity) of %s could not be checked: %s" % (granularity, verb, unicode(exc))
+            self.results['Incremental%s%s' % (verb, granularity)] =  ('unverified', message)
+            return            
         self.results['Incremental%s%s' % (verb, granularity)] = ('ok', 
             'Incremental harvesting (%s granularity) of %s works.' % (granularity, verb))
 
