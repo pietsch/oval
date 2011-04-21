@@ -21,7 +21,6 @@ from urlparse import urlparse
 from datetime import datetime
 from dateutil import parser as dateparser
 
-
 from lxml import etree
 from lxml.etree import XMLSyntaxError
 from lxml.etree import DocumentInvalid
@@ -567,7 +566,30 @@ class Validator(object):
                 message = "Possibly detected double-encoded UTF-8 characters."
                 self.results['DoubleUTF8'] = ('warning', message)
                 return
-                
+    
+    def check_handle(self):
+        try:
+            tree = self.request_oai(verb='ListRecords', metadataPrefix='oai_dc')
+        except Exception, exc:
+            return
+        text_iterator = tree.itertext()
+        handles = [t for t in text_iterator if "http://hdl.handle.net/" in t]
+        if handles == []:
+            return
+        sample_handle = random.sample(handles, 1)[0]
+        if "123456789" in sample_handle:
+            message = "Found an invalid handle using the paceholder prefix: %s" % sample_handle
+            self.results['Handle'] = ('warning', message)
+            return
+        try:
+            resp = urllib2.urlopen(sample_handle).read()
+            if "<p>-- cannot be found.</p>" in resp:
+                message = "Found an invalid handle: %s" % sample_handle
+                self.results['Handle'] = ('warning', message)
+        except:
+            return
+        return
+            
     def check_driver_conformity(self):
         """Run checks required for conformance to DRIVER guidelines"""
         self.check_identify_base_url()

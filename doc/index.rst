@@ -5,12 +5,12 @@
 
 Welcome to OVAL's documentation!
 ================================
-
-Contents:
-
 .. toctree::
    :maxdepth: 2
-
+   
+   intro
+   harvester
+   
 Indices and tables
 ==================
 
