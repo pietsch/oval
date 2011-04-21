@@ -578,7 +578,7 @@ class Validator(object):
             return
         sample_handle = random.sample(handles, 1)[0]
         if "123456789" in sample_handle:
-            message = "Found an invalid handle using the paceholder prefix: %s" % sample_handle
+            message = "Found an invalid handle using the placeholder prefix: %s" % sample_handle
             self.results['Handle'] = ('warning', message)
             return
         try:
