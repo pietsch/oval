@@ -1,12 +1,13 @@
-===============
-README for oval
-===============
+=============================
+OVAL -- The OAI-PMH Validator
+=============================
+
+Package for validating OAI-PMH interfaces.
 
 Dependencies
 ============
 
 * lxml
-* bottle.py
 
 Installing
 ==========
