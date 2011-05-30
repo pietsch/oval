@@ -92,7 +92,7 @@ def draw_sample(iterator, size):
 class Validator(object):
     """Validates OAI-OMH interfaces."""
 
-    def __init__(self, base_url, timeout=None):
+    def __init__(self, base_url, timeout=10):
         super(Validator, self).__init__()
         
         self.base_url = normalize_base_url(base_url)
