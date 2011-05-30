@@ -58,7 +58,7 @@ BASE_URLS = pickle.load(open(os.path.join(DATA_PATH, 'BASE_URLS.pickle')))
 
 schema_file = os.path.join(DATA_PATH, 'combined.xsd')
 schema_tree = etree.parse(schema_file)
-
+SCHEMA = etree.XMLSchema(schema_tree)
 
 
 def is_double_encoded(string):
@@ -185,7 +185,6 @@ class Validator(object):
 
     def validate_XML(self, verb, metadataPrefix='oai_dc', identifier=None):
         """Check if XML returned for OAI-PMH verb is well-formed and valid."""
-        SCHEMA = etree.XMLSchema(schema_tree)
         try:
             if verb in ('Identify', 'ListSets', 'ListMetadataFormats'):
                 tree = self.request_oai(verb=verb)
