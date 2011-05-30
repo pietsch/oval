@@ -56,9 +56,9 @@ DC_DATE_FULL = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([+-]\d{2}:\d{2}
 BASE_URLS = pickle.load(open(os.path.join(DATA_PATH, 'BASE_URLS.pickle')))
 
 
-schema_file = os.path.join(DATA_PATH, 'combined.xsd')
-schema_tree = etree.parse(schema_file)
-SCHEMA = etree.XMLSchema(schema_tree)
+# schema_file = os.path.join(DATA_PATH, 'combined.xsd')
+# schema_tree = etree.parse(schema_file)
+# SCHEMA = etree.XMLSchema(schema_tree)
 
 
 def is_double_encoded(string):
