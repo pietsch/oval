@@ -58,7 +58,6 @@ BASE_URLS = pickle.load(open(os.path.join(DATA_PATH, 'BASE_URLS.pickle')))
 
 schema_file = os.path.join(DATA_PATH, 'combined.xsd')
 schema_tree = etree.parse(schema_file)
-SCHEMA = etree.XMLSchema(schema_tree)
 
 
 def is_double_encoded(string):
@@ -202,6 +201,7 @@ class Validator(object):
             self.results['%sXML' % verb] = ('unverified', message)
             return
         try:
+            SCHEMA = etree.XMLSchema(schema_tree)
             SCHEMA.assertValid(tree)
             self.results['%sXML' % verb] = ('ok', '%s response well-formed and valid.' % verb)
         except DocumentInvalid, exc:
