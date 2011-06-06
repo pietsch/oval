@@ -598,10 +598,10 @@ class Validator(object):
     def check_driver_conformity(self):
         """Run checks required for conformance to DRIVER guidelines"""
         self.check_identify_base_url()
-        self.validate_XML('Identify')
+        # self.validate_XML('Identify')
         self.validate_XML('ListRecords')
-        self.validate_XML('ListIdentifiers')
-        self.validate_XML('ListSets')
+        # self.validate_XML('ListIdentifiers')
+        # self.validate_XML('ListSets')
         self.check_resumption_expiration_date('ListRecords')
         self.check_resumption_list_size('ListRecords')
         self.reasonable_batch_size('ListRecords')
