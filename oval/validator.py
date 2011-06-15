@@ -35,6 +35,8 @@ OAI_NAMESPACE = "http://www.openarchives.org/OAI/%s/"
 DC_NAMESPACE = "http://purl.org/dc/elements/1.1/"
 DC = '{%s}' % DC_NAMESPACE
 
+XS = '{http://www.w3.org/2001/XMLSchema}'
+
 # Minimal Dublin Core elements according to DRIVER and DINI
 MINIMAL_DC_SET = set([
                 'identifier',
@@ -55,6 +57,16 @@ DC_DATE_FULL = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([+-]\d{2}:\d{2}
 # URLs of Repositories indexed in BASE 
 BASE_URLS = pickle.load(open(os.path.join(DATA_PATH, 'BASE_URLS.pickle')))
 
+
+SCHEMA_TEMPLATE = """<?xml version = "1.0" encoding = "UTF-8"?>
+<xs:schema xmlns="http://dummy.libxml2.validator" 
+targetNamespace="http://dummy.libxml2.validator"
+xmlns:xs="http://www.w3.org/2001/XMLSchema"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+version="1.0"
+elementFormDefault="qualified"
+attributeFormDefault="unqualified">
+</xs:schema>"""
 
 schema_file = os.path.join(DATA_PATH, 'combined.xsd')
 schema_tree = etree.parse(schema_file)
@@ -201,8 +213,17 @@ class Validator(object):
             self.results['%sXML' % verb] = ('unverified', message)
             return
         try:
-            SCHEMA = etree.XMLSchema(schema_tree)
-            SCHEMA.assertValid(tree)
+            xml_string = etree.tounicode(tree)
+            schema_locs = set(re.findall(r'schemaLocation="(.*?)"', xml_string, re.DOTALL))
+            schema_tree = etree.XML(SCHEMA_TEMPLATE)
+            for s in set(schema_locs):
+                xs_import = etree.Element(XS + "import")
+                ns_loc = s.split()
+                xs_import.attrib['namespace'] = ns_loc[0].strip()
+                xs_import.attrib['schemaLocation'] = ns_loc[1].strip()
+                schema_tree.append(xs_import)
+            schema = etree.XMLSchema(schema_tree)
+            schema.assertValid(tree)
             self.results['%sXML' % verb] = ('ok', '%s response well-formed and valid.' % verb)
         except DocumentInvalid, exc:
             message = "%s response well-formed but invalid: %s" % (verb, unicode(exc))
@@ -598,9 +619,9 @@ class Validator(object):
     def check_driver_conformity(self):
         """Run checks required for conformance to DRIVER guidelines"""
         self.check_identify_base_url()
-        # self.validate_XML('Identify')
+        self.validate_XML('Identify')
         self.validate_XML('ListRecords')
-        # self.validate_XML('ListIdentifiers')
+        #self.validate_XML('ListIdentifiers')
         # self.validate_XML('ListSets')
         self.check_resumption_expiration_date('ListRecords')
         self.check_resumption_list_size('ListRecords')
