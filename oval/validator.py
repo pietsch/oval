@@ -68,8 +68,8 @@ elementFormDefault="qualified"
 attributeFormDefault="unqualified">
 </xs:schema>"""
 
-schema_file = os.path.join(DATA_PATH, 'combined.xsd')
-schema_tree = etree.parse(schema_file)
+# schema_file = os.path.join(DATA_PATH, 'combined.xsd')
+# schema_tree = etree.parse(schema_file)
 
 
 def is_double_encoded(string):
@@ -214,14 +214,16 @@ class Validator(object):
             return
         try:
             xml_string = etree.tounicode(tree)
-            schema_locs = set(re.findall(r'schemaLocation="(.*?)"', xml_string, re.DOTALL))
+            schema_locs = set(re.findall(r'schemaLocation="(.*?)"', xml_string, re.DOTALL))                
             schema_tree = etree.XML(SCHEMA_TEMPLATE)
             for s in set(schema_locs):
-                xs_import = etree.Element(XS + "import")
-                ns_loc = s.split()
-                xs_import.attrib['namespace'] = ns_loc[0].strip()
-                xs_import.attrib['schemaLocation'] = ns_loc[1].strip()
-                schema_tree.append(xs_import)
+                ns_locs_raw = s.split()
+                ns_locs = [(ns_locs_raw[i], ns_locs_raw[i+1]) for i in range(0, len(ns_locs_raw), 2)]
+                for (ns, loc) in ns_locs:
+                    xs_import = etree.Element(XS + "import")
+                    xs_import.attrib['namespace'] = ns.strip()
+                    xs_import.attrib['schemaLocation'] = loc.strip()
+                    schema_tree.append(xs_import)
             schema = etree.XMLSchema(schema_tree)
             schema.assertValid(tree)
             self.results['%sXML' % verb] = ('ok', '%s response well-formed and valid.' % verb)
@@ -311,8 +313,13 @@ class Validator(object):
         try:
             for record in riter:
                 test_datestamp = record.find('.//' + self.oai + 'datestamp').text
+                if not (DC_DATE_DAY.match(test_datestamp) or DC_DATE_FULL.match(test_datestamp)):
+                    message = ("Incremental harvesting (%s granularity) of %s could not be checked: "
+                                "Incorrect format for datestamp: %s." % (granularity, verb, test_datestamp))
+                    self.results['Incremental%s%s' % (verb, granularity)] = ('unverified', message)
+                    return
                 if granularity == 'day':
-                    test_datestamp = test_datestamp[:10]
+                    test_datestamp = test_datestamp[:10]                    
                 test_date = dateparser.parse(test_datestamp)
                 if test_date != reference_date:
                     self.results['Incremental%s%s' % (verb, granularity)] = ('error', 
