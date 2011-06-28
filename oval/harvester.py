@@ -5,8 +5,6 @@
     
     Basic OAI-PMH harvesting utilities.
     
-    ### NEW VERSION IMPLEMENTING THE ITERATOR PATTERN ###
-    
     
     :copyright: Copyright 2011 Mathias Loesch.
 """
