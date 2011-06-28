@@ -30,6 +30,8 @@ from oval import DATA_PATH
 from oval import ISO_639_3_CODES, ISO_639_2B_CODES
 from oval import ISO_639_2T_CODES, ISO_639_1_CODES
 
+from baselookup import BASEDirectory
+
 OAI_NAMESPACE = "http://www.openarchives.org/OAI/%s/"
 
 DC_NAMESPACE = "http://purl.org/dc/elements/1.1/"
@@ -218,7 +220,10 @@ class Validator(object):
             schema_tree = etree.XML(SCHEMA_TEMPLATE)
             for s in set(schema_locs):
                 ns_locs_raw = s.split()
-                ns_locs = [(ns_locs_raw[i], ns_locs_raw[i+1]) for i in range(0, len(ns_locs_raw), 2)]
+                try:
+                    ns_locs = [(ns_locs_raw[i], ns_locs_raw[i+1]) for i in range(0, len(ns_locs_raw), 2)]
+                except IndexError:
+                    ns_locs = []
                 for (ns, loc) in ns_locs:
                     xs_import = etree.Element(XS + "import")
                     xs_import.attrib['namespace'] = ns.strip()
@@ -649,7 +654,7 @@ class Validator(object):
         self.indexed_in_BASE()
 
 def main():
-    """Command line interface."""
+    """Prototypical command line interface."""
     from pprint import pprint
     parser = argparse.ArgumentParser(description='OVAL -- OAI-PHM Validator')
     parser.add_argument('base_url', type=str, help='the basic URL of the OAI-PMH interface')
