@@ -59,9 +59,6 @@ DC_DATE_MONTH = re.compile(r'^\d{4}-\d{2}$')
 DC_DATE_DAY = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 DC_DATE_FULL = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([+-]\d{2}:\d{2}|Z)$')
 
-# URLs of Repositories indexed in BASE 
-BASE_URLS = pickle.load(open(os.path.join(DATA_PATH, 'BASE_URLS.pickle')))
-
 
 SCHEMA_TEMPLATE = """<?xml version = "1.0" encoding = "UTF-8"?>
 <xs:schema xmlns="http://dummy.libxml2.validator" 
@@ -72,9 +69,6 @@ version="1.0"
 elementFormDefault="qualified"
 attributeFormDefault="unqualified">
 </xs:schema>"""
-
-# schema_file = os.path.join(DATA_PATH, 'combined.xsd')
-# schema_tree = etree.parse(schema_file)
 
 
 def is_double_encoded(string):
