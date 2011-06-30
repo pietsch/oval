@@ -14,6 +14,7 @@ import os
 import random
 import urllib2
 from urllib2 import URLError
+from urllib import urlencode
 import re
 import argparse
 import pickle
@@ -25,12 +26,12 @@ from lxml import etree
 from lxml.etree import XMLSyntaxError
 from lxml.etree import DocumentInvalid
 
-from oval.harvester import configure_record_iterator, configure_request, get_protocol_version, check_HTTP_methods, get_repository_information, get_granularity
+from oval.harvester import configure_record_iterator, configure_request, \
+                           get_protocol_version, check_HTTP_methods, \
+                           get_repository_information, get_granularity
 from oval import DATA_PATH
 from oval import ISO_639_3_CODES, ISO_639_2B_CODES
 from oval import ISO_639_2T_CODES, ISO_639_1_CODES
-
-from baselookup import BASEDirectory
 
 OAI_NAMESPACE = "http://www.openarchives.org/OAI/%s/"
 
@@ -38,6 +39,8 @@ DC_NAMESPACE = "http://purl.org/dc/elements/1.1/"
 DC = '{%s}' % DC_NAMESPACE
 
 XS = '{http://www.w3.org/2001/XMLSchema}'
+
+LOOKUP_URL = "http://129.70.12.31/lookup?"
 
 # Minimal Dublin Core elements according to DRIVER and DINI
 MINIMAL_DC_SET = set([
@@ -145,7 +148,7 @@ class Validator(object):
             self.results['ProtocolVersion'] =  ('error', message)
             self.protocol_version = '2.0'
             
-        #Preconfigure RecordIterator class for this repo
+        # Preconfigure RecordIterator class for this repo
         self.RecordIterator = configure_record_iterator(self.base_url, self.protocol_version, self.method, self.timeout)
         self.oai_namespace = OAI_NAMESPACE % self.protocol_version
         self.oai = "{%s}" % self.oai_namespace
@@ -161,11 +164,17 @@ class Validator(object):
     
     def indexed_in_BASE(self):
         """Check if the repository is indexed in BASE."""
-        netloc = urlparse(self.base_url).netloc
-        if netloc in BASE_URLS:
-            message = "Repository content is indexed by BASE."
+        # Remove '?' from end of base_url
+        params = {'basic_url': self.base_url[:-1]}
+        data = urlencode(params)
+        result = urllib2.urlopen(LOOKUP_URL + data)
+        result_tree = etree.parse(result)
+        indexed = result_tree.getroot()
+        timestamp = indexed.attrib['timestamp']
+        if indexed.text == 'True':
+            message = "Repository content is indexed by BASE (information as of: %s)" % timestamp
         else:
-            message = "Repository content is currently not indexed by BASE."
+            message = "Repository content is currently not indexed by BASE (information as of: %s)" % timestamp
         self.results['BASEIndex'] = ('info', message)
 
 
