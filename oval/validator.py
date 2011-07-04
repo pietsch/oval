@@ -167,6 +167,9 @@ class Validator(object):
         timestamp = indexed.attrib['timestamp']
         if indexed.text == 'True':
             message = "Repository content is indexed by BASE (information as of: %s)" % timestamp
+            collection = indexed.attrib.get('collection')
+            if collection:
+                message += """ <br/><a href="http://www.base-search.net/Search/Results?q=dccoll:%s">See all your documents in BASE</a>""" % collection
         else:
             message = "Repository content is currently not indexed by BASE (information as of: %s)" % timestamp
         self.results['BASEIndex'] = ('info', message)
