@@ -167,7 +167,7 @@ def check_HTTP_methods(base_url):
             response = fetch_data(base_url, method, {'verb': 'Identify'})
         except Exception, e:
             pass
-        if response is not None and not "badVerb" in response:
+        if response and not "badVerb" in response:
             methods.append(method)
     return methods
 
