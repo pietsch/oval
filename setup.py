@@ -13,6 +13,8 @@ import sys
 from setuptools import setup, find_packages
 from distutils import log
 
+import oval
+
 long_desc = """
 BASE OAI-PMH Validity Checker (OVAL) checks XML validity as well as conformance 
 of OAI-PMH interface to the protocol specification 
@@ -22,7 +24,7 @@ optimized for the BASE search engine (http://base-search.net).
 
 setup(
     name='oval',
-    version='0.3.1',
+    version=oval.__version__,
     url='http://www.ub.uni-bielefeld.de/',
     license='BSD',
     author='Mathias Loesch',
