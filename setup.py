@@ -22,7 +22,7 @@ optimized for the BASE search engine (http://base-search.net).
 
 setup(
     name='oval',
-    version='0.3.0',
+    version='0.3.1',
     url='http://www.ub.uni-bielefeld.de/',
     license='BSD',
     author='Mathias Loesch',
