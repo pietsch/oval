@@ -222,7 +222,7 @@ class Validator(object):
             return
         try:
             xml_string = etree.tounicode(tree)
-            schema_locs = set(re.findall(r'schemaLocation="(.*?)"', xml_string, re.DOTALL))                
+            schema_locs = set(re.findall(r'schemaLocation="(.*?)"', xml_string, re.DOTALL))
             schema_tree = etree.XML(SCHEMA_TEMPLATE)
             for s in set(schema_locs):
                 ns_locs_raw = s.split()
@@ -405,9 +405,6 @@ class Validator(object):
                         DC_DATE_DAY.match(date) or 
                         DC_DATE_FULL.match(date)):
                         wrong_date.append(record)
-                    # message = ('Found a record (%s) where the content of dc:date '
-                    #     'is not conforming to ISO 8601: "%s"' % (oai_id, date))
-                    # self.results.append(('ISO8601', 'warning', message))
         self.results['ISO8601'] = ('ok', 'dc:dates conform to ISO 8601.')
 
 
@@ -598,6 +595,7 @@ class Validator(object):
         self.results['DCIdentifierURL'] = ('ok', message)
     
     def check_double_utf8(self, sample_size=50):
+        """Check if content has been encoded doubly."""
         try:
             tree = self.request_oai(verb='ListRecords', metadataPrefix='oai_dc')
         except Exception, exc:
@@ -612,6 +610,7 @@ class Validator(object):
                 return
     
     def check_handle(self):
+        """Check if the default handle was changed."""
         try:
             tree = self.request_oai(verb='ListRecords', metadataPrefix='oai_dc')
         except Exception, exc:
@@ -633,52 +632,46 @@ class Validator(object):
         except:
             return
         return
-            
-    def check_driver_conformity(self):
-        """Run checks required for conformance to DRIVER guidelines"""
-        self.check_identify_base_url()
-        self.validate_XML('Identify')
-        self.validate_XML('ListRecords')
-        #self.validate_XML('ListIdentifiers')
-        # self.validate_XML('ListSets')
-        self.check_resumption_expiration_date('ListRecords')
-        self.check_resumption_list_size('ListRecords')
-        self.reasonable_batch_size('ListRecords')
-        self.reasonable_batch_size('ListIdentifiers')
-        self.dc_language_ISO()
-        self.dc_date_ISO()
-        self.minimal_dc_elements()
-        if self.granularity == 'day':
-            self.incremental_harvesting('ListRecords', 'day')
-        elif self.granularity == 'full':
-            self.incremental_harvesting('ListRecords', 'day')
-            self.incremental_harvesting('ListRecords', 'full')
-        self.dc_identifier_abs()
-        self.check_deleting_strategy()
-        self.check_double_utf8()
-        self.check_handle()
-        self.indexed_in_BASE()
+
 
 def main():
     """Prototypical command line interface."""
     from pprint import pprint
     parser = argparse.ArgumentParser(description='OVAL -- OAI-PHM Validator')
     parser.add_argument('base_url', type=str, help='the basic URL of the OAI-PMH interface')
-    parser.add_argument('--driver', dest='driver', action='store_true', 
-                        default=False, help='check conformance to DRIVER guidelines')
     
     args = parser.parse_args()
-    
+     
     base_url = args.base_url
-    driver = args.driver
     
     val = Validator(base_url)
-    
     print "Repository: %s" % val.repository_name
     
-    if driver:
-        val.check_driver_conformity()
-        pprint(val.results)
+    # Run checks
+    val.check_identify_base_url()
+    val.validate_XML('Identify')
+    val.validate_XML('ListRecords')
+    val.check_resumption_expiration_date('ListRecords')
+    val.check_resumption_list_size('ListRecords')
+    val.reasonable_batch_size('ListRecords')
+    val.reasonable_batch_size('ListIdentifiers')
+    val.dc_language_ISO()
+    val.dc_date_ISO()
+    val.minimal_dc_elements()
+    
+    if val.granularity == 'day':
+        val.incremental_harvesting('ListRecords', 'day')
+    elif val.granularity == 'full':
+        val.incremental_harvesting('ListRecords', 'day')
+        val.incremental_harvesting('ListRecords', 'full')
+    val.dc_identifier_abs()
+    val.check_deleting_strategy()
+    val.check_double_utf8()
+    val.check_handle()
+    val.indexed_in_BASE()
+    
+    
+    pprint(val.results)
         
 if __name__ == '__main__':
     main()
