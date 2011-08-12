@@ -15,11 +15,10 @@ from distutils import log
 
 import oval
 
-long_desc = """
-BASE OAI-PMH Validity Checker (OVAL) checks XML validity as well as conformance 
-of OAI-PMH interface to the protocol specification 
-(http://www.openarchives.org/OAI/openarchivesprotocol.html). The criteria are 
-optimized for the BASE search engine (http://base-search.net).
+long_desc = """BASE OAI-PMH Validity Checker (OVAL) checks XML validity as well as 
+conformance of OAI-PMH interface to the protocol specification 
+(http://www.openarchives.org/OAI/openarchivesprotocol.html). The test criteria are 
+optimized for the BASE search engine (http://base-search.net/).
 """
 
 setup(
@@ -42,10 +41,11 @@ setup(
     platforms='any',
     packages=find_packages(),
     include_package_data=True,
-    package_data={'oval': ['data/*.xsd', 
-                           'data/*.html',
-                           'data/*.tab', 
-                           'data/*.pickle']},
-	install_requires = ['ordereddict',
-						'lxml']
+    package_data={'oval': ['data/*.tab']},
+    install_requires = ['ordereddict','lxml'],
+    entry_points = {
+            'console_scripts': [
+                'oval = oval.validator:main',
+            ],
+        }
 )
