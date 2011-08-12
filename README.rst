@@ -1,7 +1,9 @@
 OVAL --- BASE OAI-PMH Validity Checker
 ======================================
 
-Package for testing OAI-PMH interfaces.
+Package for testing OAI-PMH interfaces' compliance with the requirements of
+the BASE search engine (http://base-search.net/). The original implementation
+with a Web frontend is located at http://oval.base-search.net/.
 
 Dependencies
 ------------

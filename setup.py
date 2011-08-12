@@ -7,7 +7,6 @@
     :copyright: Copyright 2011 Mathias Loesch.
 """
 
-
 import os
 import sys
 from setuptools import setup, find_packages
