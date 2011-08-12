@@ -29,7 +29,7 @@ from lxml.etree import DocumentInvalid
 from oval.harvester import configure_record_iterator, configure_request, \
                            get_protocol_version, check_HTTP_methods, \
                            get_repository_information, get_granularity
-from oval import DATA_PATH
+
 from oval import ISO_639_3_CODES, ISO_639_2B_CODES
 from oval import ISO_639_2T_CODES, ISO_639_1_CODES
 
@@ -72,7 +72,9 @@ attributeFormDefault="unqualified">
 
 
 def is_double_encoded(string):
-    """Check if a unicode string is double encoded UTF8."""
+    """Check if a unicode string is doubly encoded in UTF8. Warning: this
+    is a hacky heuristic.
+    """
     try:
          cleaned = string.encode('raw_unicode_escape').decode('utf8')
     except UnicodeDecodeError:
@@ -99,9 +101,10 @@ def draw_sample(iterator, size):
             break
     return items
 
+
 class Validator(object):
     """Validates OAI-OMH interfaces."""
-
+    
     def __init__(self, base_url, timeout=10):
         super(Validator, self).__init__()
         

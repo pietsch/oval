@@ -1,7 +1,7 @@
 OVAL --- BASE OAI-PMH Validity Checker
 ======================================
 
-Package for validating OAI-PMH interfaces.
+Package for testing OAI-PMH interfaces.
 
 Dependencies
 ------------

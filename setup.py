@@ -42,7 +42,10 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     package_data={'oval': ['data/*.tab']},
-    install_requires = ['ordereddict','lxml'],
+    install_requires = ['ordereddict',
+                        'lxml',
+                        'argparse'
+    ],
     entry_points = {
             'console_scripts': [
                 'oval = oval.validator:main',
