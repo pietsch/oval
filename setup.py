@@ -24,7 +24,7 @@ optimized for the BASE search engine (http://base-search.net/).
 setup(
     name='oval',
     version=oval.__version__,
-    url='http://www.ub.uni-bielefeld.de/',
+    url='http://oval.base-search.net/',
     license='BSD',
     author='Mathias Loesch',
     author_email='Mathias.Loesch@uni-bielefeld.de',
