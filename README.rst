@@ -1,5 +1,5 @@
-OVAL -- The OAI-PMH Validator
-=============================
+OVAL --- BASE OAI-PMH Validity Checker
+======================================
 
 Package for validating OAI-PMH interfaces.
 
