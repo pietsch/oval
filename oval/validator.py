@@ -480,7 +480,7 @@ class Validator(object):
         tz = parsed_expiration_date.tzinfo
         now = datetime.now(tz)
         delta = parsed_expiration_date - now
-        delta_hours = delta.total_seconds / 3600
+        delta_hours = delta.days * 24
         if delta_hours < 23:
             message = ('Resumption token should last at least 23 hours. '
                       'This one lasts: %d hour(s).' % delta_hours)
