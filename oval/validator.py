@@ -407,7 +407,7 @@ class Validator(object):
                         DC_DATE_MONTH.match(date) or
                         DC_DATE_DAY.match(date) or 
                         DC_DATE_FULL.match(date)):
-                        wrong_date.append(record)
+                    wrong_date.append(record)
         self.results['ISO8601'] = ('ok', 'dc:dates conform to ISO 8601.')
 
 
@@ -480,7 +480,7 @@ class Validator(object):
         tz = parsed_expiration_date.tzinfo
         now = datetime.now(tz)
         delta = parsed_expiration_date - now
-        delta_hours = delta.seconds / 60 / 60
+        delta_hours = delta.total_seconds / 3600
         if delta_hours < 23:
             message = ('Resumption token should last at least 23 hours. '
                       'This one lasts: %d hour(s).' % delta_hours)
