@@ -24,7 +24,7 @@ from dateutil import parser as dateparser
 
 from lxml import etree
 from lxml.etree import XMLSyntaxError
-from lxml.etree import DocumentInvalid
+from lxml.etree import DocumentInvalid, XMLSchemaParseError
 
 from oval.harvester import configure_record_iterator, configure_request, \
                            get_protocol_version, check_HTTP_methods, \
@@ -241,7 +241,7 @@ class Validator(object):
             schema = etree.XMLSchema(schema_tree)
             schema.assertValid(tree)
             self.results['%sXML' % verb] = ('ok', '%s response well-formed and valid.' % verb)
-        except DocumentInvalid, exc:
+        except (DocumentInvalid, XMLSchemaParseError), exc:
             message = "%s response well-formed but invalid: %s" % (verb, unicode(exc))
             self.results['%sXML' % verb] = ('error', message)
 
