@@ -20,3 +20,8 @@ Indices and tables
 * :ref:`modindex`
 * :ref:`search`
 
+.. only:: html
+
+    PDF Download
+    ------------
+    Download this documentation as `PDF document <http://oval.base-search.net/doc/OVAL.pdf>`_.
