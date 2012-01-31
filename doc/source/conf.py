@@ -13,12 +13,13 @@
 
 import sys, os
 
-import oval
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-#sys.path.insert(0, os.path.abspath('.'))
+
+sys.path.insert(0, os.path.abspath('../../'))
+import oval
 
 # -- General configuration -----------------------------------------------------
 
@@ -93,7 +94,7 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'sphinxdoc'
+html_theme = 'ub'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -101,7 +102,7 @@ html_theme = 'sphinxdoc'
 #html_theme_options = {}
 
 # Add any paths that contain custom themes here, relative to this directory.
-#html_theme_path = []
+html_theme_path = ['_theme']
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
@@ -112,7 +113,7 @@ html_theme = 'sphinxdoc'
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-#html_logo = None
+html_logo = 'ovallogo.png'
 
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
@@ -134,6 +135,10 @@ html_static_path = ['_static']
 
 # Custom sidebar templates, maps document names to template names.
 #html_sidebars = {}
+html_sidebars = {
+   '**': ['version.html', 'globaltoc.html', 'searchbox.html']
+}
+
 
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
@@ -173,14 +178,14 @@ htmlhelp_basename = 'OVALdoc'
 
 latex_elements = {
 # The paper size ('letterpaper' or 'a4paper').
-#'papersize': 'letterpaper',
+'papersize': 'letterpaper',
 
 # The font size ('10pt', '11pt' or '12pt').
-#'pointsize': '10pt',
-
+'pointsize': '12pt',
 # Additional stuff for the LaTeX preamble.
 #'preamble': '',
 }
+
 
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
@@ -191,7 +196,7 @@ latex_documents = [
 
 # The name of an image file (relative to this directory) to place at the top of
 # the title page.
-#latex_logo = None
+latex_logo = 'ovallogo.png'
 
 # For "manual" documents, if this is true, then toplevel headings are parts,
 # not chapters.
