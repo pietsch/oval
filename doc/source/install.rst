@@ -108,3 +108,8 @@ verb. Note that you can also use this method for other OAI-PMH verbs.
      'IdentifyXML': ('ok', 'Identify response well-formed and valid.'),
      'ListRecordsXML': ('ok', 'ListRecords response well-formed and valid.'),
      'ProtocolVersion': ('ok', 'OAI-PMH version is 2.0')}
+
+By now you have some basic knowledge about how to use the 
+:class:`~oval.validator.Validator` object and already performed some validation
+steps. You should now proceed to its :class:`API documentation <oval.validator.Validator>` and get an overview of 
+all validation methods available.
