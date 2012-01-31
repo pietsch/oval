@@ -5,7 +5,7 @@ This section describes the validator module which will be
 used by most users.
 
 
-.. module:: validator
+.. module:: oval.validator
    
 Validator Object
 ----------------

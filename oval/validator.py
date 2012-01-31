@@ -118,10 +118,20 @@ class Validator(object):
 
     This object is the core of OVAL and serves as its central
     interface. It is instantiated per repository with the URL to
-    the OAI-PMH endpoint of the server to be validated::
+    the OAI-PMH endpoint::
 
         validator = Validator('http://eprints.rclis.org/dspace-oai/request')
-        
+    
+    Note that the validation methods do not return anything but store
+    their results in the :attr:`results` attribute::
+
+        elis_validator.validate_XML('ListRecords')
+        elis_validator.results
+        {'HTTPMethod': ('ok', 'Server supports both GET and POST requests.'),
+        'ListRecordsXML': ('ok', 'ListRecords response well-formed and valid.'),
+        'ProtocolVersion': ('ok', 'OAI-PMH version is 2.0')}
+
+
     :param base_url: The OAI-PMH endpoint of the validated repository.
     :param timeout: Optional timeout in seconds for all requests to the server.
     """

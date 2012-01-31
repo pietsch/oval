@@ -14,7 +14,7 @@ Setup
 
 Download the current source from GitHub at 
 https://github.com/syslogd/oval/tarball/master.
-Unpack, cd into resulting directore and run
+Unpack, cd into resulting directory and run
 
 .. code-block:: sh
 
@@ -42,8 +42,8 @@ We create a :class:`~oval.validator.Validator` object with that URL:
     >>> elis_validator = Validator('http://eprints.rclis.org/dspace-oai/request')
 
 Our freshly created :class:`~oval.validator.Validator` object instantly connects the 
-OAI-PMH interface and gets some basic information about the repository, for example the 
-human-readable name of the repository and the admin's email address:
+OAI-PMH interface and gets some basic information about the repository, for example its 
+human-readable name and the admin's email address:
 
 .. code-block:: python
 
@@ -97,7 +97,7 @@ add their results to the :attr:`results` dictionary instead:
      'ListRecordsXML': ('ok', 'ListRecords response well-formed and valid.'),
      'ProtocolVersion': ('ok', 'OAI-PMH version is 2.0')}
 
-The XML output of this repository seems to be OK, at least for the ``ListRecord``
+The XML output of this repository seems to be OK, at least for the ``ListRecords``
 verb. Note that you can also use this method for other OAI-PMH verbs.
 
 .. code-block:: python

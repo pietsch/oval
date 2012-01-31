@@ -12,6 +12,17 @@ OAI-PMH validators.
 
 .. note::
     
-    Please note that this document describes the back-end.
-    The web application front-end is developed separately in
-    a project named *ovalserver*.
+    Please note that the OVAL backend and the web application front-end are 
+    developed separately. This documentation describes the backend.
+
+
+Package Design
+--------------
+
+OVAL consists of two layers: 
+
+The :mod:`~oval.validator` module is the high-level user
+interface that should be used by external programs.
+
+It is based on the :mod:`~oval.harvester` module, which takes
+care of the low-level OAI-PMH communication.

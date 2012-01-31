@@ -69,7 +69,13 @@ def memoize(duration=30, max_length=10):
 
 
 def normalize_params(params):
-    """Clean parameters in accordance with OAI-PMH."""
+    """Clean parameters in accordance with OAI-PMH.
+
+    Explanation: OAI-PMH requires that the resumptionToken parameter be the
+    exclusive argument.
+
+    :param params: The HTTP parameters for a request.
+    """
     if params.get('resumptionToken') is not None:
         #metadataPrefix/from/until not allowed if resumptionToken -> remove
         try:
@@ -96,7 +102,8 @@ def normalize_params(params):
 
 @memoize()
 def fetch_data(base_url, method, params, retries=5, timeout=None):
-    """Perform actual request to the OAI interface and return the data.
+    """Perform actual request to the OAI interface and return the data 
+    as XML string.
        
        :param base_url: The endpoint of the OAI-PMH interface.
        :param method: The HTTP method to be used for the requests.
@@ -135,11 +142,12 @@ def fetch_data(base_url, method, params, retries=5, timeout=None):
             raise
 
 def configure_request(base_url, method='POST', timeout=None):
-    """Closure to preconfigure the static request params.
+    """Closure to preconfigure the static request params. Return
+    custom request_oai function.
         
-       :param base_url: The endpoint of the OAI-PMH interface.
-       :param method: The HTTP method to be used for the requests.
-       :param timeout: The timeout in seconds for the requests.
+    :param base_url: The endpoint of the OAI-PMH interface.
+    :param method: The HTTP method to be used for the requests.
+    :param timeout: The timeout in seconds for the requests.
     """
     def request_oai(**kw):
         """Perform OAI request to base_url. Return parsed response."""
@@ -150,6 +158,11 @@ def configure_request(base_url, method='POST', timeout=None):
     return request_oai
 
 def get_protocol_version(base_url, method):
+    """Determine the version of the OAI-PMH spoken by the server.
+
+    :param base_url: The URL of the OAI-PMH endpoint.
+    :param method: The HTTP method for requests to the endpoint.
+    """
     pversion_re = re.compile(r'<protocolVersion>(.*?)</protocolVersion>')
     try:
         response = fetch_data(base_url, method, {'verb': 'Identify'})
@@ -175,8 +188,10 @@ def get_granularity(base_url, method):
             return 'day'
 
 def check_HTTP_methods(base_url):
-    """Make sure server supports GET and POST as required. Return supported
+    """Determine the HTTP methods supported by the server. Return supported
     methods in list or [].
+    
+    :param base_url: The endpoint of the OAI-PMH interface.
     """
     methods = []
     for method in ['GET', 'POST']:
@@ -218,7 +233,8 @@ def configure_record_iterator(base_url, protocol_version, HTTPmethod, timeout=No
        :param timeout: Optional timeout for the HTTP requests sent to the server.
     """
     class RecordIterator(object):
-        """Iterator over OAI records transparently aggregated via OAI-PMH.
+        """Iterator over OAI records/identifiers transparently aggregated via 
+        OAI-PMH.
 
            :param verb: The OAI-PMH verb for the items to iterate over.
            :param metadataPrefix: The OAI-PMH metadataPrefix attribute.
