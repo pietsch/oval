@@ -1,1 +1,6 @@
 .DS_Store
+*.pyc
+oval.egg-info/*
+build/*
+dist/*
+doc/build/*
