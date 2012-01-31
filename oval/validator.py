@@ -74,6 +74,8 @@ attributeFormDefault="unqualified">
 def is_double_encoded(string):
     """Check if a unicode string is doubly encoded in UTF8. Warning: this
     is a hacky heuristic.
+
+    :param string: The string whose encoding is to be verified.
     """
     try:
          cleaned = string.encode('raw_unicode_escape').decode('utf8')
@@ -84,6 +86,10 @@ def is_double_encoded(string):
     return cleaned != string
 
 def normalize_base_url(url):
+    """Ensure a clean OAI-PMH endpoint without parameters ending with '?'.
+       
+       :param url: The URL to the OAI-PMH endpoint.
+    """
     url = url.strip()
     if '?verb=' in url:
         url = url[:url.index('verb=')]
@@ -94,6 +100,11 @@ def normalize_base_url(url):
     return url
     
 def draw_sample(iterator, size):
+    """Get a sample of iterable items from a RecordIterator instance.
+        
+       :param iterator: Instance of RecordIterator.
+       :size: Desired sample size.
+    """
     items = []
     for item in iterator:
         items.append(item)
@@ -103,7 +114,17 @@ def draw_sample(iterator, size):
 
 
 class Validator(object):
-    """Validates OAI-OMH interfaces."""
+    """OAI-PMH Validator
+
+    This object is the core of OVAL and serves as its central
+    interface. It is instantiated per repository with the URL to
+    the OAI-PMH endpoint of the server to be validated::
+
+        validator = Validator('http://eprints.rclis.org/dspace-oai/request')
+        
+    :param base_url: The OAI-PMH endpoint of the validated repository.
+    :param timeout: Optional timeout in seconds for all requests to the server.
+    """
     
     def __init__(self, base_url, timeout=10):
         super(Validator, self).__init__()
@@ -160,7 +181,9 @@ class Validator(object):
         self.request_oai = configure_request(self.base_url, self.method, timeout=self.timeout)
     
     def indexed_in_BASE(self):
-        """Check if the repository is indexed in BASE."""
+        """Check if the repository is indexed in BASE. This method calls an external
+        web service at http://129.70.12.31/lookup that provides this information.
+        """
         # Remove '?' from end of base_url
         params = {'basic_url': self.base_url[:-1]}
         data = urlencode(params)
@@ -179,7 +202,9 @@ class Validator(object):
 
 
     def check_identify_base_url(self):
-        """Compare field baseURL in Identify response with self.base_url."""
+        """Compare the field baseURL in Identify response with self.base_url.
+        Some servers redirect requests to new endpoints.
+        """
         # In version 2.0, the requestURL field was renamed to requestURL
         if self.protocol_version == '2.0':
             request_tagname = 'request'
@@ -206,7 +231,12 @@ class Validator(object):
             
 
     def validate_XML(self, verb, metadataPrefix='oai_dc', identifier=None):
-        """Check if XML returned for OAI-PMH verb is well-formed and valid."""
+        """Check if XML returned for OAI-PMH verb is well-formed and valid.
+
+
+        :param verb: Any valid OAI-PMH verb.
+        :param metadataPrefix: Any metadataPrefix supported by the repository.
+        """
         try:
             if verb in ('Identify', 'ListSets', 'ListMetadataFormats'):
                 tree = self.request_oai(verb=verb)
@@ -251,6 +281,11 @@ class Validator(object):
         """Check if a reasonable number of data records is returned for a
         ListRecords/ListIdentifiers request. Default values are set according
         to the DRIVER guidelines.
+
+        :param verb: The OAI-PMH verb.
+        :param metadataPrefix: Optional OAI-PMH metadataPrefix.
+        :param min_batch_size: The minimal batch size of items to be returned.
+        :param max_batch_size: The maximal batch size of items to be returned.
         """
         try:
             riter = self.RecordIterator(verb, metadataPrefix, deleted=True)
@@ -284,6 +319,11 @@ class Validator(object):
 
     def incremental_harvesting(self, verb, granularity, metadataPrefix='oai_dc', sample_size=50):
         """Check if server supports incremental harvesting using time granularity.
+
+           :param verb: The OAI-PMH verb.
+           :param granularity: The time granularity. Can be 'full' or 'day'.
+           :param metadataPrefix: The OAI-PMH metadataPrefix.
+           :param sample_size: How many records should be inspected?
         """
         try:
             riter = self.RecordIterator(verb, metadataPrefix)
@@ -349,7 +389,11 @@ class Validator(object):
             'Incremental harvesting (%s granularity) of %s works.' % (granularity, verb))
 
     def minimal_dc_elements(self, minimal_set=MINIMAL_DC_SET, sample_size=50):
-        """Check for the minimal set of Dublin Core elements."""
+        """Check for the minimal set of Dublin Core elements.
+           
+        :param minimal_set: The set of minimal DC elements that should be present.
+        :param sample_size: How many records should be inspected? 
+        """
         try:
             riter = self.RecordIterator(verb='ListRecords', metadataPrefix='oai_dc', deleted=False)
             records = draw_sample(riter, sample_size)
@@ -380,7 +424,10 @@ class Validator(object):
                             'present.' % ', '.join(minimal_set))
 
     def dc_date_ISO(self, sample_size=50):
-        """Check if dc:date conforms to ISO 8601 (matches YYYY-MM-DD)."""
+        """Check if dc:date conforms to ISO 8601 (matches YYYY-MM-DD).
+
+        :param sample_size: How many records should be inspected?
+        """
         try:
             riter = self.RecordIterator(verb='ListRecords', metadataPrefix='oai_dc', deleted=False)
             records = draw_sample(riter, sample_size)
@@ -412,7 +459,10 @@ class Validator(object):
 
 
     def dc_language_ISO(self, sample_size=50):
-        """Check if dc:language conforms to ISO 639-3/-2B/-2T/-1."""
+        """Check if dc:language conforms to ISO 639-3/-2B/-2T/-1.
+
+        :param sample_size: How many records should be inspected?
+        """
         try:
             riter = self.RecordIterator(verb='ListRecords', metadataPrefix='oai_dc')
             records = draw_sample(riter, sample_size)
@@ -452,6 +502,9 @@ class Validator(object):
 
     def check_resumption_expiration_date(self, verb, metadataPrefix='oai_dc'):
         """Make sure that the resumption token is good for at least 23h.
+
+        :param verb: The OAI-PMH verb.
+        :param metadataPrefix: The OAI-PMH metadataPrefix.
         """
         try:
             tree = self.request_oai(verb=verb, metadataPrefix=metadataPrefix)
@@ -491,7 +544,11 @@ class Validator(object):
         return
 
     def check_resumption_list_size(self, verb, metadataPrefix='oai_dc'):
-        """Make sure that the list size resumption token is reasonable."""
+        """Make sure that the list size resumption token is reasonable.
+
+        :param verb: The OAI-PMH verb.
+        :param metadataPrefix: The OAI-PMH metadataPrefix.
+        """
         try:
             tree = self.request_oai(verb='ListRecords', metadataPrefix='oai_dc')
         except Exception, exc:
@@ -552,7 +609,10 @@ class Validator(object):
         self.results['DeletingStrategy'] = (report, message)
 
     def dc_identifier_abs(self, sample_size=50):
-        """Check if dc:identifier contains an absolute URL."""
+        """Check if dc:identifier contains an absolute URL.
+        
+        :param sample_size: How many records should be inspected?
+        """
         try:
             riter = self.RecordIterator(verb='ListRecords', metadataPrefix='oai_dc')
             records = draw_sample(riter, sample_size)
@@ -598,7 +658,10 @@ class Validator(object):
         self.results['DCIdentifierURL'] = ('ok', message)
     
     def check_double_utf8(self, sample_size=50):
-        """Check if content has been encoded doubly."""
+        """Check if content has been encoded doubly.
+        
+        :param sample_size: How many records should be inspected?
+        """
         try:
             tree = self.request_oai(verb='ListRecords', metadataPrefix='oai_dc')
         except Exception, exc:
@@ -613,7 +676,7 @@ class Validator(object):
                 return
     
     def check_handle(self):
-        """Check if the default handle was changed."""
+        """DSpace-specific. Check if the default handle was changed."""
         try:
             tree = self.request_oai(verb='ListRecords', metadataPrefix='oai_dc')
         except Exception, exc:

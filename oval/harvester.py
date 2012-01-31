@@ -26,9 +26,13 @@ from urllib2 import HTTPError, URLError, Request
 from urllib import urlencode
 from StringIO import StringIO
 
+from functools import wraps
+
 from ordereddict import OrderedDict
 from oval import __version__ as ovalversion
 from lxml import etree
+
+
 
 CACHE = OrderedDict()
     
@@ -43,6 +47,7 @@ def compute_key(function, args, kw):
 def memoize(duration=30, max_length=10):
     """Donald Michie's memo function for caching."""
     def _memoize(function):
+        @wraps(function)
         def __memoize(*args, **kw):
             key = compute_key(function, args, kw)
             if len(CACHE) > max_length:
@@ -91,7 +96,15 @@ def normalize_params(params):
 
 @memoize()
 def fetch_data(base_url, method, params, retries=5, timeout=None):
-    """Perform actual request and return the data."""
+    """Perform actual request to the OAI interface and return the data.
+       
+       :param base_url: The endpoint of the OAI-PMH interface.
+       :param method: The HTTP method to be used for the requests.
+       :param params: The GET/POST variables.
+       :param retries: How many retries should be performed on responses
+                       with status code 503.
+       :param timeout: The timeout in seconds for the requests.
+    """
     data = urlencode(params)
     if method == 'POST':
         request = Request(base_url)
@@ -122,7 +135,12 @@ def fetch_data(base_url, method, params, retries=5, timeout=None):
             raise
 
 def configure_request(base_url, method='POST', timeout=None):
-    """Closure to preconfigure the static request params."""
+    """Closure to preconfigure the static request params.
+        
+       :param base_url: The endpoint of the OAI-PMH interface.
+       :param method: The HTTP method to be used for the requests.
+       :param timeout: The timeout in seconds for the requests.
+    """
     def request_oai(**kw):
         """Perform OAI request to base_url. Return parsed response."""
         params = kw
@@ -192,9 +210,23 @@ def get_repository_information(base_url, method):
     return name, email
 
 def configure_record_iterator(base_url, protocol_version, HTTPmethod, timeout=None):
-    """Class factory for record iterators."""
+    """Class factory for record iterators.
+       
+       :param base_url: The endpoint of the OAI-PMH interface.
+       :param protocol_version: The version of the OAI-PMH interface.
+       :param HTTPmethod: The HTTP method supported by the server.
+       :param timeout: Optional timeout for the HTTP requests sent to the server.
+    """
     class RecordIterator(object):
-        """Iterator over OAI records gradually aggregated via OAI-PMH."""
+        """Iterator over OAI records transparently aggregated via OAI-PMH.
+
+           :param verb: The OAI-PMH verb for the items to iterate over.
+           :param metadataPrefix: The OAI-PMH metadataPrefix attribute.
+           :param _from: Optional date offset.
+           :param until: Optional date limit.
+           :param deleted: Flag specifiying whether deleted records should be
+                           included 
+        """
         def __init__(self, verb, metadataPrefix, _from=None, until=None, 
                     deleted=False):
             self.base_url = base_url
