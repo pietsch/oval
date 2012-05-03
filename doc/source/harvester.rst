@@ -7,7 +7,6 @@ validator should normally not have to use it directly.
 
 .. module:: oval.harvester
 
-
 Harvester Module
 ----------------
 
