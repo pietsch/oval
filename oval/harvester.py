@@ -122,7 +122,7 @@ def fetch_data(base_url, method, params, retries=5, timeout=None):
     elif method == 'GET':
         request = Request(base_url + data)
     request.add_header('User-Agent', 'oval/%s' % ovalversion)
-    for i in range(retries):
+    for _ in range(retries):
         try:
             response = urllib2.urlopen(request, None, timeout=timeout)
             return response.read()
@@ -205,7 +205,7 @@ def check_HTTP_methods(base_url):
         response = None
         try:
             response = fetch_data(base_url, method, {'verb': 'Identify'})
-        except Exception, e:
+        except Exception:
             pass
         if response and not "badVerb" in response:
             methods.append(method)
@@ -217,7 +217,7 @@ def get_repository_information(base_url, method):
     email_re = re.compile(r'<adminEmail>(.*?)</adminEmail>')
     try:
         response = fetch_data(base_url, method, {'verb': 'Identify'})
-    except Exception, e:
+    except Exception:
         return ('[ERROR: Could not fetch Identify response]',
                 '[ERROR: Could not fetch Identify response]')
     name_match = name_re.search(response)
