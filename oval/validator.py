@@ -471,9 +471,8 @@ class Validator(object):
             return
         no_date = []
         wrong_date = []
-        correct_date = []
+
         for record in records:
-            oai_id = record.find('.//' + self.oai + 'identifier').text
             dc_dates = record.findall('.//' + DC + 'date')
             dc_dates = filter(lambda d: d.text is not None, dc_dates)
             if dc_dates == []:
@@ -693,15 +692,12 @@ class Validator(object):
         message = "Tested records contain absolute URLs in dc:identifier."
         self.results['DCIdentifierURL'] = ('ok', message)
 
-    def check_double_utf8(self, sample_size=50):
-        """Check if content has been encoded doubly.
-
-        :param sample_size: How many records should be inspected?
-        """
+    def check_double_utf8(self):
+        """Check if content has been encoded doubly."""
         try:
             tree = self.request_oai(
                 verb='ListRecords', metadataPrefix='oai_dc')
-        except Exception, exc:
+        except Exception:
             return
         descriptions = tree.findall('.//' + DC + 'description')
         description_texts = [
@@ -718,7 +714,7 @@ class Validator(object):
         try:
             tree = self.request_oai(
                 verb='ListRecords', metadataPrefix='oai_dc')
-        except Exception, exc:
+        except Exception:
             return
         text_iterator = tree.itertext()
         handles = [t for t in text_iterator if "http://hdl.handle.net/" in t]
