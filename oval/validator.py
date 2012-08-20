@@ -9,15 +9,11 @@
     :copyright: Copyright 2011 Mathias Loesch.
 """
 
-import os
-
 import random
 import urllib2
-from urllib2 import URLError
 from urllib import urlencode
 import re
 import argparse
-import pickle
 from urlparse import urlparse
 from datetime import datetime
 from dateutil import parser as dateparser
