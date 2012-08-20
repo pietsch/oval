@@ -20,11 +20,10 @@ from time import sleep
 import hashlib
 import pickle
 import re
-from itertools import chain
+
 import urllib2
-from urllib2 import HTTPError, URLError, Request
+from urllib2 import URLError, Request
 from urllib import urlencode
-from StringIO import StringIO
 
 from functools import wraps
 
