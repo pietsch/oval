@@ -12,6 +12,10 @@ Dependencies
 * argparse
 * lxml
 
+If you use the build script provided to install these dependencies, you will need a
+working C compiler (eg. GCC), the python and libxml development headers, and the xslt-config tool (typically
+found in the libxslt(1)-dev package or similar, provided by your package manager).
+
 Installation
 ------------
 
