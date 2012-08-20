@@ -2,8 +2,12 @@ OVAL --- BASE OAI-PMH Validator
 ===============================
 
 Package for testing OAI-PMH interfaces' compliance with the requirements of
-the BASE search engine (http://base-search.net/). This package powers the Web application
-located at http://oval.base-search.net/.
+the BASE search engine (http://base-search.net/). 
+
+While this involves validating OAI-PMH protocol compliance, the library also 
+provides additional functions for identifying common content-related flaws in the 
+output of OAI interfaces. 
+The library powers the Web application located at http://oval.base-search.net/.
 
 Dependencies
 ------------
