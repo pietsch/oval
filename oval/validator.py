@@ -5,7 +5,7 @@
     ~~~~~~~~~~~~
 
     The core module of oval.
-    
+
     :copyright: Copyright 2011 Mathias Loesch.
 """
 
@@ -27,8 +27,8 @@ from lxml.etree import XMLSyntaxError
 from lxml.etree import DocumentInvalid, XMLSchemaParseError
 
 from oval.harvester import configure_record_iterator, configure_request, \
-                           get_protocol_version, check_HTTP_methods, \
-                           get_repository_information, get_granularity
+    get_protocol_version, check_HTTP_methods, \
+    get_repository_information, get_granularity
 
 from oval import ISO_639_3_CODES, ISO_639_2B_CODES
 from oval import ISO_639_2T_CODES, ISO_639_1_CODES
@@ -44,11 +44,11 @@ LOOKUP_URL = "http://129.70.12.31/lookup?"
 
 # Minimal Dublin Core elements according to DRIVER and DINI
 MINIMAL_DC_SET = set([
-                'identifier',
-                'title',
-                'date',
-                'type',
-                'creator'])
+                     'identifier',
+                     'title',
+                     'date',
+                     'type',
+                     'creator'])
 
 # Protocol Version Scheme
 VERSION_PATTERN = re.compile(r'<protocolVersion>(.*?)</protocolVersion>')
@@ -57,11 +57,12 @@ VERSION_PATTERN = re.compile(r'<protocolVersion>(.*?)</protocolVersion>')
 DC_DATE_YEAR = re.compile(r'^\d{4}$')
 DC_DATE_MONTH = re.compile(r'^\d{4}-\d{2}$')
 DC_DATE_DAY = re.compile(r'^\d{4}-\d{2}-\d{2}$')
-DC_DATE_FULL = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([+-]\d{2}:\d{2}|Z)$')
+DC_DATE_FULL = re.compile(
+    r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([+-]\d{2}:\d{2}|Z)$')
 
 
 SCHEMA_TEMPLATE = """<?xml version = "1.0" encoding = "UTF-8"?>
-<xs:schema xmlns="http://dummy.libxml2.validator" 
+<xs:schema xmlns="http://dummy.libxml2.validator"
 targetNamespace="http://dummy.libxml2.validator"
 xmlns:xs="http://www.w3.org/2001/XMLSchema"
 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -78,16 +79,17 @@ def is_double_encoded(string):
     :param string: The string whose encoding is to be verified.
     """
     try:
-         cleaned = string.encode('raw_unicode_escape').decode('utf8')
+        cleaned = string.encode('raw_unicode_escape').decode('utf8')
     except UnicodeDecodeError:
         return False
     if '\\u' in cleaned:
         return False
     return cleaned != string
 
+
 def normalize_base_url(url):
     """Ensure a clean OAI-PMH endpoint without parameters ending with '?'.
-       
+
        :param url: The URL to the OAI-PMH endpoint.
     """
     url = url.strip()
@@ -98,10 +100,11 @@ def normalize_base_url(url):
     else:
         url = url + '?'
     return url
-    
+
+
 def draw_sample(iterator, size):
     """Get a sample of iterable items from a RecordIterator instance.
-        
+
        :param iterator: Instance of RecordIterator.
        :size: Desired sample size.
     """
@@ -121,7 +124,7 @@ class Validator(object):
     the OAI-PMH endpoint::
 
         validator = Validator('http://eprints.rclis.org/dspace-oai/request')
-    
+
     Note that the validation methods do not return anything but store
     their results in the :attr:`results` attribute::
 
@@ -135,14 +138,14 @@ class Validator(object):
     :param base_url: The OAI-PMH endpoint of the validated repository.
     :param timeout: Optional timeout in seconds for all requests to the server.
     """
-    
+
     def __init__(self, base_url, timeout=10):
         super(Validator, self).__init__()
-        
+
         self.base_url = normalize_base_url(base_url)
         self.timeout = timeout
         self.results = {}
-        
+
         #HTTP-Method
         supported_methods = check_HTTP_methods(self.base_url)
         if len(supported_methods) == 2:
@@ -156,14 +159,15 @@ class Validator(object):
             self.method = supported_method
         else:
             message = ('Could not determine supported HTTP methods. '
-                      'Falling back to GET.')
-            self.results['HTTPMethod'] =  ('warning', message)
+                       'Falling back to GET.')
+            self.results['HTTPMethod'] = ('warning', message)
             self.method = 'GET'
-        
-        self.protocol_version = get_protocol_version(self.base_url, self.method)
+
+        self.protocol_version = get_protocol_version(
+            self.base_url, self.method)
         if self.protocol_version is None:
             message = 'Could not determine OAI-PMH protocol version; assuming 2.0'
-            self.results['ProtocolVersion'] =  ('warning', message)
+            self.results['ProtocolVersion'] = ('warning', message)
             self.protocol_version = '2.0'
         elif self.protocol_version == '1.0' or self.protocol_version == '1.1':
             message = 'OAI-PMH version %s is deprecated. Consider updating to 2.0.' % self.protocol_version
@@ -173,23 +177,26 @@ class Validator(object):
             self.results['ProtocolVersion'] = ('ok', message)
         else:
             message = 'Undefined OAI-PMH protocol version: %s Assuming 2.0' % self.protocol_version
-            self.results['ProtocolVersion'] =  ('error', message)
+            self.results['ProtocolVersion'] = ('error', message)
             self.protocol_version = '2.0'
-            
+
         # Preconfigure RecordIterator class for this repo
-        self.RecordIterator = configure_record_iterator(self.base_url, self.protocol_version, self.method, self.timeout)
+        self.RecordIterator = configure_record_iterator(self.base_url,
+                                                        self.protocol_version, self.method, self.timeout)
         self.oai_namespace = OAI_NAMESPACE % self.protocol_version
         self.oai = "{%s}" % self.oai_namespace
-        
+
         # General Repository Information
-        self.repository_name, self.admin_email = get_repository_information(self.base_url,
-                                                    self.method)
+        self.repository_name, self.admin_email = get_repository_information(
+            self.base_url,
+            self.method)
         self.granularity = get_granularity(self.base_url, self.method)
         if self.granularity is None:
             # Fall back to day granularity in case it could not be determined
             self.granularity = 'day'
-        self.request_oai = configure_request(self.base_url, self.method, timeout=self.timeout)
-    
+        self.request_oai = configure_request(
+            self.base_url, self.method, timeout=self.timeout)
+
     def indexed_in_BASE(self):
         """Check if the repository is indexed in BASE. This method calls an external
         web service at http://129.70.12.31/lookup that provides this information.
@@ -210,7 +217,6 @@ class Validator(object):
             message = "Repository content is currently not indexed by BASE (information as of: %s)" % timestamp
         self.results['BASEIndex'] = ('info', message)
 
-
     def check_identify_base_url(self):
         """Compare the field baseURL in Identify response with self.base_url.
         Some servers redirect requests to new endpoints.
@@ -229,7 +235,7 @@ class Validator(object):
             return
         if request_field is None:
             message = 'Could not compare basic URLs: field "%s" not found.' % request_tagname
-            self.results['BaseURLMatch']= ('unverified', message)
+            self.results['BaseURLMatch'] = ('unverified', message)
             return
         request_url = request_field.text
         if self.base_url[:-1] == request_url:
@@ -238,7 +244,6 @@ class Validator(object):
         else:
             message = 'Requests seem to be redirected to: "%s"' % request_url
             self.results['BaseURLMatch'] = ('warning', message)
-            
 
     def validate_XML(self, verb, metadataPrefix='oai_dc', identifier=None):
         """Check if XML returned for OAI-PMH verb is well-formed and valid.
@@ -252,25 +257,28 @@ class Validator(object):
                 tree = self.request_oai(verb=verb)
 
             elif verb in ('ListRecords', 'ListIdentifiers', 'GetRecord'):
-                tree = self.request_oai(verb=verb, metadataPrefix=metadataPrefix,
-                                        identifier=identifier)
+                tree = self.request_oai(
+                    verb=verb, metadataPrefix=metadataPrefix,
+                    identifier=identifier)
         except XMLSyntaxError, exc:
-            message = '%s response is not well-formed: %s' % (verb, unicode(exc))
+            message = '%s response is not well-formed: %s' % (
+                verb, unicode(exc))
             self.results['%sXML' % verb] = ('error', message)
             return
         except Exception, exc:
             message = 'XML response of %s could not be validated: %s' % (verb,
-                                                                    unicode(exc))
+                                                                         unicode(exc))
             self.results['%sXML' % verb] = ('unverified', message)
             return
         try:
             xml_string = etree.tounicode(tree)
-            schema_locs = set(re.findall(r'schemaLocation="(.*?)"', xml_string, re.DOTALL))
+            schema_locs = set(re.findall(
+                r'schemaLocation="(.*?)"', xml_string, re.DOTALL))
             schema_tree = etree.XML(SCHEMA_TEMPLATE)
             for s in set(schema_locs):
                 ns_locs_raw = s.split()
                 try:
-                    ns_locs = [(ns_locs_raw[i], ns_locs_raw[i+1]) for i in range(0, len(ns_locs_raw), 2)]
+                    ns_locs = [(ns_locs_raw[i], ns_locs_raw[i + 1]) for i in range(0, len(ns_locs_raw), 2)]
                 except IndexError:
                     ns_locs = []
                 for (ns, loc) in ns_locs:
@@ -280,14 +288,15 @@ class Validator(object):
                     schema_tree.append(xs_import)
             schema = etree.XMLSchema(schema_tree)
             schema.assertValid(tree)
-            self.results['%sXML' % verb] = ('ok', '%s response well-formed and valid.' % verb)
+            self.results['%sXML' % verb] = (
+                'ok', '%s response well-formed and valid.' % verb)
         except (DocumentInvalid, XMLSchemaParseError), exc:
-            message = "%s response well-formed but invalid: %s" % (verb, unicode(exc))
+            message = "%s response well-formed but invalid: %s" % (
+                verb, unicode(exc))
             self.results['%sXML' % verb] = ('error', message)
 
-
-    def reasonable_batch_size(self, verb, metadataPrefix='oai_dc', 
-                            min_batch_size=100, max_batch_size=500):
+    def reasonable_batch_size(self, verb, metadataPrefix='oai_dc',
+                              min_batch_size=100, max_batch_size=500):
         """Check if a reasonable number of data records is returned for a
         ListRecords/ListIdentifiers request. Default values are set according
         to the DRIVER guidelines.
@@ -300,18 +309,21 @@ class Validator(object):
         try:
             riter = self.RecordIterator(verb, metadataPrefix, deleted=True)
         except Exception, exc:
-            message = "%s batch size could not be checked: %s" % (verb, unicode(exc))
+            message = "%s batch size could not be checked: %s" % (
+                verb, unicode(exc))
             self.results['%sBatch' % verb] = ('unverified', message)
             return
         # resumptionToken found? (= are there multiple batches?)
         if riter.token is None:
-            message = ('%s batch size could not be checked: Only one batch.' % verb)
+            message = ('%s batch size could not be checked: Only one batch.' %
+                       verb)
             self.results['%sBatch' % verb] = ('unverified', message)
             return
         batch_size = len(riter.record_list)
-        
+
         if batch_size == 0:
-            message = ('%s batch size could not be checked: No records.' % verb)
+            message = ('%s batch size could not be checked: No records.' %
+                       verb)
             self.results['%sBatch' % verb] = ('unverified', message)
             return
         if batch_size < min_batch_size:
@@ -326,7 +338,6 @@ class Validator(object):
             message = '%s batch size is %d.' % (verb, batch_size)
             self.results['%sBatch' % verb] = ('ok', message)
 
-
     def incremental_harvesting(self, verb, granularity, metadataPrefix='oai_dc', sample_size=50):
         """Check if server supports incremental harvesting using time granularity.
 
@@ -340,75 +351,86 @@ class Validator(object):
             records = draw_sample(riter, sample_size)
         except Exception, exc:
             message = "Incremental harvesting (%s granularity) of %s could not be checked: %s" % (granularity, verb, unicode(exc))
-            self.results['Incremental%s%s' % (verb, granularity)] =  ('unverified', message)
+            self.results['Incremental%s%s' % (verb,
+                                              granularity)] = ('unverified', message)
             return
         if len(records) == 0:
             message = "Incremental harvesting (%s granularity) of %s could not be checked: No records." % (granularity, verb)
-            self.results['Incremental%s%s' % (verb, granularity)] = ('unverified', message)
+            self.results['Incremental%s%s' % (verb,
+                                              granularity)] = ('unverified', message)
             return
         reference_record = random.sample(records, 1)[0]
-        reference_datestamp_elem = reference_record.find('.//' + self.oai + 'datestamp')
+        reference_datestamp_elem = reference_record.find(
+            './/' + self.oai + 'datestamp')
         if reference_datestamp_elem is None:
             message = "Incremental harvesting (%s granularity) of %s could not be checked: No datestamp." % (granularity, verb)
-            self.results['Incremental%s%s' % (verb, granularity)] = ('unverified', message)
+            self.results['Incremental%s%s' % (verb,
+                                              granularity)] = ('unverified', message)
             return
         reference_datestamp = reference_datestamp_elem.text
         if not (DC_DATE_DAY.match(reference_datestamp) or DC_DATE_FULL.match(reference_datestamp)):
             message = ("Incremental harvesting (%s granularity) of %s could not be checked: "
-                        "Incorrect format for datestamp: %s." % (granularity, verb, reference_datestamp))
-            self.results['Incremental%s%s' % (verb, granularity)] = ('unverified', message)
+                       "Incorrect format for datestamp: %s." % (granularity, verb, reference_datestamp))
+            self.results['Incremental%s%s' % (verb,
+                                              granularity)] = ('unverified', message)
             return
         if granularity == 'day':
             reference_datestamp = reference_datestamp[:10]
         reference_date = dateparser.parse(reference_datestamp)
         try:
-            riter = self.RecordIterator(verb, metadataPrefix=metadataPrefix, 
-                                _from=reference_datestamp,
-                                until=reference_datestamp)
+            riter = self.RecordIterator(verb, metadataPrefix=metadataPrefix,
+                                        _from=reference_datestamp,
+                                        until=reference_datestamp)
         except Exception, exc:
             message = "Incremental harvesting (%s granularity) of %s could not be checked: %s" % (granularity, verb, unicode(exc))
-            self.results['Incremental%s%s' % (verb, granularity)] = ('unverified', message)
+            self.results['Incremental%s%s' % (verb,
+                                              granularity)] = ('unverified', message)
             return
         if len(riter.record_list) == 0:
-            self.results['Incremental%s%s' % (verb, granularity)] = ('error', 
-                                'No incremental harvesting (%s granularity) of %s: ' 
-                                'Harvest for reference date %s returned no records.'% (granularity, verb, reference_datestamp))
+            self.results['Incremental%s%s' % (verb, granularity)] = ('error',
+                                                                     'No incremental harvesting (%s granularity) of %s: '
+                                                                     'Harvest for reference date %s returned no records.' % (granularity, verb, reference_datestamp))
             return
         try:
             for record in riter:
-                test_datestamp = record.find('.//' + self.oai + 'datestamp').text
+                test_datestamp = record.find(
+                    './/' + self.oai + 'datestamp').text
                 if not (DC_DATE_DAY.match(test_datestamp) or DC_DATE_FULL.match(test_datestamp)):
                     message = ("Incremental harvesting (%s granularity) of %s could not be checked: "
-                                "Incorrect format for datestamp: %s." % (granularity, verb, test_datestamp))
-                    self.results['Incremental%s%s' % (verb, granularity)] = ('unverified', message)
+                               "Incorrect format for datestamp: %s." % (granularity, verb, test_datestamp))
+                    self.results['Incremental%s%s' % (verb, granularity)
+                                 ] = ('unverified', message)
                     return
                 if granularity == 'day':
-                    test_datestamp = test_datestamp[:10]                    
+                    test_datestamp = test_datestamp[:10]
                 test_date = dateparser.parse(test_datestamp)
                 if test_date != reference_date:
-                    self.results['Incremental%s%s' % (verb, granularity)] = ('error', 
-                                        'No incremental (%s granularity) harvesting of %s. ' 
-                                        'Harvest for reference date %s returned record with date %s.' % (granularity, verb, 
-                                        reference_datestamp, test_datestamp))
+                    self.results['Incremental%s%s' % (verb, granularity)] = ('error',
+                                                                             'No incremental (%s granularity) harvesting of %s. '
+                                                                             'Harvest for reference date %s returned record with date %s.' % (granularity, verb,
+                                                                                                                                              reference_datestamp, test_datestamp))
                     return
         except Exception, exc:
             message = "Incremental harvesting (%s granularity) of %s could not be checked: %s" % (granularity, verb, unicode(exc))
-            self.results['Incremental%s%s' % (verb, granularity)] =  ('unverified', message)
-            return            
-        self.results['Incremental%s%s' % (verb, granularity)] = ('ok', 
-            'Incremental harvesting (%s granularity) of %s works.' % (granularity, verb))
+            self.results['Incremental%s%s' % (verb,
+                                              granularity)] = ('unverified', message)
+            return
+        self.results['Incremental%s%s' % (verb, granularity)] = ('ok',
+                                                                 'Incremental harvesting (%s granularity) of %s works.' % (granularity, verb))
 
     def minimal_dc_elements(self, minimal_set=MINIMAL_DC_SET, sample_size=50):
         """Check for the minimal set of Dublin Core elements.
-           
+
         :param minimal_set: The set of minimal DC elements that should be present.
-        :param sample_size: How many records should be inspected? 
+        :param sample_size: How many records should be inspected?
         """
         try:
-            riter = self.RecordIterator(verb='ListRecords', metadataPrefix='oai_dc', deleted=False)
+            riter = self.RecordIterator(verb='ListRecords',
+                                        metadataPrefix='oai_dc', deleted=False)
             records = draw_sample(riter, sample_size)
         except Exception, exc:
-            message = 'Minimal DC elements could not be checked: %s' % unicode(exc)
+            message = 'Minimal DC elements could not be checked: %s' % unicode(
+                exc)
             self.results['MinimalDC'] = ('unverified', message)
             return
         if len(records) == 0:
@@ -423,15 +445,15 @@ class Validator(object):
             intersect = minimal_set - dc_tags
             if intersect != set():
                 message = ("Records should at least contain the DC "
-                          "elements: %s. Found a record (%s) missing the "
-                          "following DC element(s): %s.")
+                           "elements: %s. Found a record (%s) missing the "
+                           "following DC element(s): %s.")
                 self.results['MinimalDC'] = ('warning', message % (
-                                                         ", ".join(minimal_set),
-                                                          oai_id, 
-                                                        ", ".join(intersect)))
+                                             ", ".join(minimal_set),
+                                             oai_id,
+                                             ", ".join(intersect)))
                 return
         self.results['MinimalDC'] = ('ok', 'Minimal DC elements (%s) are '
-                            'present.' % ', '.join(minimal_set))
+                                     'present.' % ', '.join(minimal_set))
 
     def dc_date_ISO(self, sample_size=50):
         """Check if dc:date conforms to ISO 8601 (matches YYYY-MM-DD).
@@ -439,7 +461,8 @@ class Validator(object):
         :param sample_size: How many records should be inspected?
         """
         try:
-            riter = self.RecordIterator(verb='ListRecords', metadataPrefix='oai_dc', deleted=False)
+            riter = self.RecordIterator(verb='ListRecords',
+                                        metadataPrefix='oai_dc', deleted=False)
             records = draw_sample(riter, sample_size)
         except Exception, exc:
             message = 'dc:date ISO 8601 conformance could not be checked: %s' % unicode(exc)
@@ -447,10 +470,12 @@ class Validator(object):
             return
         if len(records) == 0:
             message = "dc:date ISO 8601 conformance could not be checked: No records."
-            self.results['ISO8601'] = ('unverified', 
-                                message)
+            self.results['ISO8601'] = ('unverified',
+                                       message)
             return
-        no_date = []; wrong_date = []; correct_date = []
+        no_date = []
+        wrong_date = []
+        correct_date = []
         for record in records:
             oai_id = record.find('.//' + self.oai + 'identifier').text
             dc_dates = record.findall('.//' + DC + 'date')
@@ -462,11 +487,10 @@ class Validator(object):
                 date = dc_date.text
                 if not (DC_DATE_YEAR.match(date) or
                         DC_DATE_MONTH.match(date) or
-                        DC_DATE_DAY.match(date) or 
+                        DC_DATE_DAY.match(date) or
                         DC_DATE_FULL.match(date)):
                     wrong_date.append(record)
         self.results['ISO8601'] = ('ok', 'dc:dates conform to ISO 8601.')
-
 
     def dc_language_ISO(self, sample_size=50):
         """Check if dc:language conforms to ISO 639-3/-2B/-2T/-1.
@@ -474,7 +498,8 @@ class Validator(object):
         :param sample_size: How many records should be inspected?
         """
         try:
-            riter = self.RecordIterator(verb='ListRecords', metadataPrefix='oai_dc')
+            riter = self.RecordIterator(
+                verb='ListRecords', metadataPrefix='oai_dc')
             records = draw_sample(riter, sample_size)
         except Exception, exc:
             message = 'dc:language conformance to ISO 639 could not be checked: %s' % unicode(exc)
@@ -484,12 +509,12 @@ class Validator(object):
             message = 'dc:language conformance to ISO 639 could not be checked: no records.'
             self.results['ISO639'] = ('unverified', message)
             return
-        language_elements = reduce(lambda x,y: x+y, [r.findall('.//' + DC + 'language') 
-                                                    for r in records])
+        language_elements = reduce(lambda x, y: x + y, [r.findall('.//' + DC + 'language')
+                                                        for r in records])
         languages = [e.text for e in language_elements if e.text is not None]
         if languages == []:
-            message = ('dc:language conformance to ISO 639 could not be checked: ' 
-                        'no dc:language element found')
+            message = ('dc:language conformance to ISO 639 could not be checked: '
+                       'no dc:language element found')
             self.results['ISO639'] = ('unverified', message)
             return
         supported_isos = set()
@@ -504,10 +529,11 @@ class Validator(object):
                 supported_isos.add('639-1')
             else:
                 message = ('dc:language should conform to ISO 639, '
-                        'found "%s"' % language)
+                           'found "%s"' % language)
                 self.results['ISO639'] = ('recommendation', message)
-                return  
-        message = 'dc:language elements conform to ISO %s.' % ", ".join(supported_isos)
+                return
+        message = 'dc:language elements conform to ISO %s.' % ", ".join(
+            supported_isos)
         self.results['ISO639'] = ('ok', message)
 
     def check_resumption_expiration_date(self, verb, metadataPrefix='oai_dc'):
@@ -546,7 +572,7 @@ class Validator(object):
         delta_hours = delta.days * 24
         if delta_hours < 23:
             message = ('Resumption token should last at least 23 hours. '
-                      'This one lasts: %d hour(s).' % delta_hours)
+                       'This one lasts: %d hour(s).' % delta_hours)
             self.results['ResumptionTokenExp'] = ('recommendation', message)
             return
         message = 'Resumption token lasts %d hours.' % delta_hours
@@ -560,7 +586,8 @@ class Validator(object):
         :param metadataPrefix: The OAI-PMH metadataPrefix.
         """
         try:
-            tree = self.request_oai(verb='ListRecords', metadataPrefix='oai_dc')
+            tree = self.request_oai(
+                verb='ListRecords', metadataPrefix='oai_dc')
         except Exception, exc:
             message = 'completeListSize of resumption token could not be checked: %s' % unicode(exc)
             self.results['ResumptionTokenList'] = ('unverified', message)
@@ -585,8 +612,8 @@ class Validator(object):
             self.results['ResumptionTokenList'] = ('error', message)
             return
         if list_size <= number_of_records:
-            message = 'Value of completeListSize (%d) makes no sense. Records in first batch: %d' % (list_size, 
-                                                                                            number_of_records)
+            message = 'Value of completeListSize (%d) makes no sense. Records in first batch: %d' % (list_size,
+                                                                                                     number_of_records)
             self.results['ResumptionTokenList'] = ('error', message)
             return
         message = 'completeListSize: %d records.' % list_size
@@ -597,19 +624,21 @@ class Validator(object):
         """Report the deleting strategy; recommend persistent or transient"""
         try:
             tree = self.request_oai(verb='Identify')
-            deleting_strategy = tree.find('.//' + self.oai + 'deletedRecord').text
+            deleting_strategy = tree.find(
+                './/' + self.oai + 'deletedRecord').text
         except AttributeError:
             message = "Deleting strategy could not be checked: deletedRecord element not found."
             self.results['DeletingStrategy'] = ('unverified', message)
             return
         except Exception, exc:
-            message = "Deleting strategy could not be checked: %s" % unicode(exc)
+            message = "Deleting strategy could not be checked: %s" % unicode(
+                exc)
             self.results['DeletingStrategy'] = ('unverified', message)
             return
         if deleting_strategy == 'no':
             message = (u'Deleting strategy is "no" – recommended is persistent or '
-                      'transient.')
-            report = 'recommendation'    
+                       'transient.')
+            report = 'recommendation'
         elif deleting_strategy in ('transient', 'persistent'):
             message = 'Deleting strategy is "%s"' % deleting_strategy
             report = 'ok'
@@ -620,11 +649,12 @@ class Validator(object):
 
     def dc_identifier_abs(self, sample_size=50):
         """Check if dc:identifier contains an absolute URL.
-        
+
         :param sample_size: How many records should be inspected?
         """
         try:
-            riter = self.RecordIterator(verb='ListRecords', metadataPrefix='oai_dc')
+            riter = self.RecordIterator(
+                verb='ListRecords', metadataPrefix='oai_dc')
             records = draw_sample(riter, sample_size)
         except Exception, exc:
             message = "Could not check URL in dc:identifier: %s" % unicode(exc)
@@ -634,7 +664,7 @@ class Validator(object):
             message = "Could not check URL in dc:identifier: No records."
             self.results['DCIdentifierURL'] = ('unverified', message)
             return
-            # message = ("Could not check for absolute URLs in dc:identifiers: " 
+            # message = ("Could not check for absolute URLs in dc:identifiers: "
             #            "No dc:identifiers found.")
             # self.results.append(('DCIdentifierURL', 'unverified', message))
         found_abs_urls = set()
@@ -644,7 +674,7 @@ class Validator(object):
             identifiers = record.findall('.//' + DC + 'identifier')
             if identifiers == []:
                 message = ("Found at least one record missing dc:identifier: %s"
-                            % oai_id)
+                           % oai_id)
                 self.results['DCIdentifierURL'] = ('warning', message)
                 return
             for identifier_element in identifiers:
@@ -661,34 +691,37 @@ class Validator(object):
                 return
         if len(records) > 1 and len(found_abs_urls) == 1:
             message = ("All records have the same URL in dc:identifier: %s"
-                        % list(found_abs_urls)[0])
+                       % list(found_abs_urls)[0])
             self.results['DCIdentifierURL'] = ('warning', message)
             return
         message = "Tested records contain absolute URLs in dc:identifier."
         self.results['DCIdentifierURL'] = ('ok', message)
-    
+
     def check_double_utf8(self, sample_size=50):
         """Check if content has been encoded doubly.
-        
+
         :param sample_size: How many records should be inspected?
         """
         try:
-            tree = self.request_oai(verb='ListRecords', metadataPrefix='oai_dc')
+            tree = self.request_oai(
+                verb='ListRecords', metadataPrefix='oai_dc')
         except Exception, exc:
             return
         descriptions = tree.findall('.//' + DC + 'description')
-        description_texts = [d.text for d in descriptions if d.text is not None]
-        
+        description_texts = [
+            d.text for d in descriptions if d.text is not None]
+
         for text in description_texts:
             if is_double_encoded(text):
                 message = "Possibly detected double-encoded UTF-8 characters."
                 self.results['DoubleUTF8'] = ('warning', message)
                 return
-    
+
     def check_handle(self):
         """DSpace-specific. Check if the default handle was changed."""
         try:
-            tree = self.request_oai(verb='ListRecords', metadataPrefix='oai_dc')
+            tree = self.request_oai(
+                verb='ListRecords', metadataPrefix='oai_dc')
         except Exception, exc:
             return
         text_iterator = tree.itertext()
@@ -714,15 +747,16 @@ def main():
     """Prototypical command line interface."""
     from pprint import pprint
     parser = argparse.ArgumentParser(description='OVAL -- OAI-PHM Validator')
-    parser.add_argument('base_url', type=str, help='the basic URL of the OAI-PMH interface')
-    
+    parser.add_argument('base_url', type=str,
+                        help='the basic URL of the OAI-PMH interface')
+
     args = parser.parse_args()
-     
+
     base_url = args.base_url
-    
+
     val = Validator(base_url)
     print "Repository: %s" % val.repository_name
-    
+
     # Run checks
     val.check_identify_base_url()
     val.validate_XML('Identify')
@@ -734,7 +768,7 @@ def main():
     val.dc_language_ISO()
     val.dc_date_ISO()
     val.minimal_dc_elements()
-    
+
     if val.granularity == 'day':
         val.incremental_harvesting('ListRecords', 'day')
     elif val.granularity == 'full':
@@ -745,9 +779,8 @@ def main():
     val.check_double_utf8()
     val.check_handle()
     val.indexed_in_BASE()
-    
-    
+
     pprint(val.results)
-        
+
 if __name__ == '__main__':
     main()
