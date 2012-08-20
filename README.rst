@@ -1,5 +1,5 @@
-OVAL --- BASE OAI-PMH Validity Checker
-======================================
+OVAL --- BASE OAI-PMH Validator
+===============================
 
 Package for testing OAI-PMH interfaces' compliance with the requirements of
 the BASE search engine (http://base-search.net/). This package powers the Web application
