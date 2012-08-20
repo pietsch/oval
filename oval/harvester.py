@@ -2,10 +2,10 @@
 """
     harvester.py
     ~~~~~~~~~~~~
-    
+
     Basic OAI-PMH harvesting utilities.
-    
-    
+
+
     :copyright: Copyright 2011 Mathias Loesch.
 """
 
@@ -21,7 +21,7 @@ import hashlib
 import pickle
 import re
 from itertools import chain
-import urllib2 
+import urllib2
 from urllib2 import HTTPError, URLError, Request
 from urllib import urlencode
 from StringIO import StringIO
@@ -33,16 +33,19 @@ from oval import __version__ as ovalversion
 from lxml import etree
 
 
-
 CACHE = OrderedDict()
-    
+
 # Caching
+
+
 def is_obsolete(entry, duration):
     return time.time() - entry['time'] > duration
+
 
 def compute_key(function, args, kw):
     key = pickle.dumps((function.func_name, args, kw))
     return hashlib.sha1(key).hexdigest()
+
 
 def memoize(duration=30, max_length=10):
     """Donald Michie's memo function for caching."""
@@ -100,11 +103,12 @@ def normalize_params(params):
             nparams[param] = params[param]
     return nparams
 
+
 @memoize()
 def fetch_data(base_url, method, params, retries=5, timeout=None):
-    """Perform actual request to the OAI interface and return the data 
+    """Perform actual request to the OAI interface and return the data
     as XML string.
-       
+
        :param base_url: The endpoint of the OAI-PMH interface.
        :param method: The HTTP method to be used for the requests.
        :param params: The GET/POST variables.
@@ -141,10 +145,11 @@ def fetch_data(base_url, method, params, retries=5, timeout=None):
         except Exception:
             raise
 
+
 def configure_request(base_url, method='POST', timeout=None):
     """Closure to preconfigure the static request params. Return
     custom request_oai function.
-        
+
     :param base_url: The endpoint of the OAI-PMH interface.
     :param method: The HTTP method to be used for the requests.
     :param timeout: The timeout in seconds for the requests.
@@ -156,6 +161,7 @@ def configure_request(base_url, method='POST', timeout=None):
         response = fetch_data(base_url, method, params, timeout=timeout)
         return etree.XML(response)
     return request_oai
+
 
 def get_protocol_version(base_url, method):
     """Determine the version of the OAI-PMH spoken by the server.
@@ -173,6 +179,7 @@ def get_protocol_version(base_url, method):
         version = m.group(1)
         return version
 
+
 def get_granularity(base_url, method):
     granularity_re = re.compile(r'<granularity>(.*?)</granularity>')
     try:
@@ -187,10 +194,11 @@ def get_granularity(base_url, method):
         elif granularity == 'YYYY-MM-DD':
             return 'day'
 
+
 def check_HTTP_methods(base_url):
     """Determine the HTTP methods supported by the server. Return supported
     methods in list or [].
-    
+
     :param base_url: The endpoint of the OAI-PMH interface.
     """
     methods = []
@@ -204,13 +212,14 @@ def check_HTTP_methods(base_url):
             methods.append(method)
     return methods
 
+
 def get_repository_information(base_url, method):
     name_re = re.compile(r'<repositoryName>(.*?)</repositoryName>')
     email_re = re.compile(r'<adminEmail>(.*?)</adminEmail>')
     try:
         response = fetch_data(base_url, method, {'verb': 'Identify'})
     except Exception, e:
-        return ('[ERROR: Could not fetch Identify response]', 
+        return ('[ERROR: Could not fetch Identify response]',
                 '[ERROR: Could not fetch Identify response]')
     name_match = name_re.search(response)
     if name_match is None:
@@ -224,16 +233,17 @@ def get_repository_information(base_url, method):
         email = email_match.group(1).decode('utf8')
     return name, email
 
+
 def configure_record_iterator(base_url, protocol_version, HTTPmethod, timeout=None):
     """Class factory for record iterators.
-       
+
        :param base_url: The endpoint of the OAI-PMH interface.
        :param protocol_version: The version of the OAI-PMH interface.
        :param HTTPmethod: The HTTP method supported by the server.
        :param timeout: Optional timeout for the HTTP requests sent to the server.
     """
     class RecordIterator(object):
-        """Iterator over OAI records/identifiers transparently aggregated via 
+        """Iterator over OAI records/identifiers transparently aggregated via
         OAI-PMH.
 
            :param verb: The OAI-PMH verb for the items to iterate over.
@@ -241,20 +251,20 @@ def configure_record_iterator(base_url, protocol_version, HTTPmethod, timeout=No
            :param _from: Optional date offset.
            :param until: Optional date limit.
            :param deleted: Flag specifiying whether deleted records should be
-                           included 
+                           included
         """
-        def __init__(self, verb, metadataPrefix, _from=None, until=None, 
+        def __init__(self, verb, metadataPrefix, _from=None, until=None,
                     deleted=False):
             self.base_url = base_url
             self.verb = verb
             self.metadataPrefix = metadataPrefix
             self._from = _from
             self.until = until
-            self.deleted = deleted # include deleted records?
+            self.deleted = deleted  # include deleted records?
             self.protocol_version = protocol_version
             self.HTTPmethod = HTTPmethod
             self.timeout = timeout
-            
+
             #OAI namespace
             self.oai_namespace = OAI % self.protocol_version
             # record list
@@ -266,9 +276,10 @@ def configure_record_iterator(base_url, protocol_version, HTTPmethod, timeout=No
             elif self.verb == 'ListIdentifiers':
                 self.element = 'header'
             #Configure request method
-            self.request_oai = configure_request(self.base_url, self.HTTPmethod, self.timeout)
+            self.request_oai = configure_request(
+                self.base_url, self.HTTPmethod, self.timeout)
             #Fetch the initial portion
-            response = self.request_oai(verb=self.verb, 
+            response = self.request_oai(verb=self.verb,
                         metadataPrefix=self.metadataPrefix,
                         _from=self._from, until=self.until,
                         resumptionToken=self.token)
@@ -277,41 +288,43 @@ def configure_record_iterator(base_url, protocol_version, HTTPmethod, timeout=No
 
         def __iter__(self):
             return self
-    
+
         def _is_not_deleted(self, record):
             if self.element == 'record':
                 header = record.find('.//' + self.oai_namespace + 'header')
             elif self.element == 'header':
-                header = record # work on header element directly in case of ListId
+                header = record  # work on header element directly in case of ListId
             if header.attrib.get('status') == 'deleted':
                 return False
             else:
                 return True
-    
+
         def _get_resumption_token(self, xml_tree):
-            token = xml_tree.find('.//' + self.oai_namespace + 'resumptionToken')
+            token = xml_tree.find(
+                './/' + self.oai_namespace + 'resumptionToken')
             if token is None:
                 return None
             else:
                 return token.text
-    
+
         def _get_records(self, xml_tree):
-            records = xml_tree.findall('.//' + self.oai_namespace + self.element)
+            records = xml_tree.findall(
+                './/' + self.oai_namespace + self.element)
             if self.deleted == False:
                 records = filter(self._is_not_deleted, records)
             return records
-        
+
         def _next_batch(self):
             while self.record_list == []:
-                response = self.request_oai(verb=self.verb, 
+                response = self.request_oai(verb=self.verb,
                             metadataPrefix=self.metadataPrefix,
                             _from=self._from, until=self.until,
                             resumptionToken=self.token)
                 self.record_list = self._get_records(response)
                 self.token = self._get_resumption_token(response)
-                if self.record_list == [] and self.token == None:
+                if self.record_list == [] and self.token is None:
                     raise StopIteration
-        
+
         def next(self):
             if (len(self.record_list) == 0 and self.token is None):
                 raise StopIteration
