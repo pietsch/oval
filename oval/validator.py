@@ -11,7 +11,7 @@
 
 import random
 import urllib2
-from urllib import urlencode
+from urllib import urlencode, urlopen
 import re
 import argparse
 from urlparse import urlparse
@@ -24,7 +24,7 @@ from lxml.etree import DocumentInvalid, XMLSchemaParseError
 
 from oval.harvester import configure_record_iterator, configure_request, \
     get_protocol_version, check_HTTP_methods, \
-    get_repository_information, get_granularity
+    get_repository_information, get_granularity, fetch_data
 
 from oval import ISO_639_3_CODES, ISO_639_2B_CODES
 from oval import ISO_639_2T_CODES, ISO_639_1_CODES
@@ -217,29 +217,15 @@ class Validator(object):
         """Compare the field baseURL in Identify response with self.base_url.
         Some servers redirect requests to new endpoints.
         """
-        # In version 2.0, the requestURL field was renamed to requestURL
-        if self.protocol_version == '2.0':
-            request_tagname = 'request'
-        else:
-            request_tagname = 'requestURL'
         try:
-            tree = self.request_oai(verb='Identify')
-            request_field = tree.find('.//' + self.oai + request_tagname)
+            response = urlopen(self.base_url)
         except Exception, exc:
             message = "Could not compare basic URLs: %s" % unicode(exc)
             self.results['BaseURLMatch'] = ('unverified', message)
             return
-        if request_field is None:
-            message = 'Could not compare basic URLs: field "%s" not found.' % request_tagname
-            self.results['BaseURLMatch'] = ('unverified', message)
-            return
-        request_url = request_field.text
-        if self.base_url[:-1] == request_url:
-            message = 'URL in "%s" (Identify) matches provided basic URL.' % request_tagname
-            self.results['BaseURLMatch'] = ('ok', message)
-        else:
-            message = 'Requests seem to be redirected to: "%s"' % request_url
-            self.results['BaseURLMatch'] = ('warning', message)
+        if urlparse(response.url).netloc != urlparse(self.base_url).netloc:
+            message = "Requests seem to be redirected to: %s" % response.url
+            self.results["BaseURLMatch"] = ("warning", message)
 
     def validate_XML(self, verb, metadataPrefix='oai_dc', identifier=None):
         """Check if XML returned for OAI-PMH verb is well-formed and valid.
