@@ -363,6 +363,7 @@ class Validator(object):
             riter = self.RecordIterator(verb, metadataPrefix=metadataPrefix,
                                         _from=reference_datestamp,
                                         until=reference_datestamp)
+            test_records = draw_sample(riter, sample_size)
         except Exception, exc:
             message = "Incremental harvesting (%s granularity) of %s could not be checked: %s" % (granularity, verb, unicode(exc))
             self.results['Incremental%s%s' % (verb,
@@ -374,7 +375,7 @@ class Validator(object):
                                                                      'Harvest for reference date %s returned no records.' % (granularity, verb, reference_datestamp))
             return
         try:
-            for record in riter:
+            for record in test_records:
                 test_datestamp = record.find(
                     './/' + self.oai + 'datestamp').text
                 if not (DC_DATE_DAY.match(test_datestamp) or DC_DATE_FULL.match(test_datestamp)):
