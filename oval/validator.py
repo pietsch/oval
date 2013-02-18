@@ -518,8 +518,10 @@ class Validator(object):
             supported_isos)
         self.results['ISO639'] = ('ok', message)
 
-    def check_resumption_expiration_date(self, verb, metadataPrefix='oai_dc'):
-        """Make sure that the resumption token is good for at least 23h.
+    def check_resumption_token(self, verb, metadataPrefix='oai_dc'):
+        """Check resumption requests.
+        - Make sure resumption requests return records.
+        - Make sure that the resumption token is good for at least 23h.
 
         :param verb: The OAI-PMH verb.
         :param metadataPrefix: The OAI-PMH metadataPrefix.
@@ -527,58 +529,58 @@ class Validator(object):
         try:
             tree = self.request_oai(verb=verb, metadataPrefix=metadataPrefix)
         except Exception, exc:
-            message = 'Expiration date of resumption token could not be checked: %s' % unicode(exc)
-            self.results['ResumptionTokenExp'] = ('unverified', message)
+            message = 'Resumption requests could not be checked: %s' % unicode(exc)
+            self.results['ResumptionToken'] = ('unverified', message)
             return
         resumption_token = tree.find('.//' + self.oai + 'resumptionToken')
         if resumption_token is None:
-            message = 'Expiration date of resumption token could not be checked: No token found'
-            self.results['ResumptionTokenExp'] = ('unverified', message)
+            message = 'Resumption requests could not be checked: No resumptionToken found'
+            self.results['ResumptionToken'] = ('unverified', message)
             return
+        # Check resumptionRequests
+        token_text = resumption_token.text
+        if token_text is None:
+            message = 'Element resumptionToken has no value.'
+            self.results['ResumptionToken'] = ('error', message)
+            return
+        try:
+            tree = self.request_oai(verb=verb, resumptionToken=token_text)
+            records = tree.findall('.//' + self.oai + 'record')
+            if not records:
+                message = 'Request for resumptionToken "%s" returned no records!' % token_text
+                self.results['ResumptionToken'] = ('error', message)
+            else:
+                message = 'Resumption requests work'
+                self.results['ResumptionToken'] = ('ok', message)
+        except Exception, exc:
+            message = 'Error during resumption request: %s' % unicode(exc)
+            self.results['ResumptionToken'] = ('error', message)
+        # Check expirationDate
         attribs = resumption_token.attrib
         expiration_date = attribs.get('expirationDate')
         if expiration_date is None:
             message = 'resumptionToken should contain expirationDate information.'
             self.results['ResumptionTokenExp'] = ('recommendation', message)
-            return
-        try:
-            parsed_expiration_date = dateparser.parse(expiration_date)
-        except ValueError:
-            message = ('Expiration date of resumption token could not be checked: '
-                       'invalid date format: %s' % expiration_date)
-            self.results['ResumptionTokenExp'] = ('error', message)
-            return
-        tz = parsed_expiration_date.tzinfo
-        now = datetime.now(tz)
-        delta = parsed_expiration_date - now
-        delta_hours = delta.days * 24
-        if delta_hours < 23:
-            message = ('Resumption token should last at least 23 hours. '
-                       'This one lasts: %d hour(s).' % delta_hours)
-            self.results['ResumptionTokenExp'] = ('recommendation', message)
-            return
-        message = 'Resumption token lasts %d hours.' % delta_hours
-        self.results['ResumptionTokenExp'] = ('ok', message)
-        return
-
-    def check_resumption_list_size(self, verb, metadataPrefix='oai_dc'):
-        """Make sure that the list size resumption token is reasonable.
-
-        :param verb: The OAI-PMH verb.
-        :param metadataPrefix: The OAI-PMH metadataPrefix.
-        """
-        try:
-            tree = self.request_oai(
-                verb='ListRecords', metadataPrefix='oai_dc')
-        except Exception, exc:
-            message = 'completeListSize of resumption token could not be checked: %s' % unicode(exc)
-            self.results['ResumptionTokenList'] = ('unverified', message)
-            return
-        resumption_token = tree.find('.//' + self.oai + 'resumptionToken')
-        if resumption_token is None:
-            message = 'completeListSize of resumption token could not be checked: No token found'
-            self.results['ResumptionTokenList'] = ('unverified', message)
-            return
+        else:
+            try:
+                parsed_expiration_date = dateparser.parse(expiration_date)
+                tz = parsed_expiration_date.tzinfo
+                now = datetime.now(tz)
+                delta = parsed_expiration_date - now
+                delta_hours = delta.days * 24
+                if delta_hours < 23:
+                    message = ('Resumption token should last at least 23 hours. '
+                           'This one lasts: %d hour(s).' % delta_hours)
+                    self.results['ResumptionTokenExp'] = ('recommendation', message)
+                else:
+                    message = 'Resumption token lasts %d hours.' % delta_hours
+                    self.results['ResumptionTokenExp'] = ('ok', message)
+            except ValueError:
+                message = ('Expiration date of resumption token could not be checked: '
+                           'invalid date format: %s' % expiration_date)
+                self.results['ResumptionTokenExp'] = ('error', message)
+        
+        # Check completeListSize
         riter = self.RecordIterator(verb=verb, metadataPrefix=metadataPrefix)
         number_of_records = len(riter.record_list)
         attribs = resumption_token.attrib
@@ -601,6 +603,8 @@ class Validator(object):
         message = 'completeListSize: %d records.' % list_size
         self.results['ResumptionTokenList'] = ('ok', message)
         return
+
+        
 
     def check_deleting_strategy(self):
         """Report the deleting strategy; recommend persistent or transient"""
