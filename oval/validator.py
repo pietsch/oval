@@ -369,7 +369,7 @@ class Validator(object):
             self.results['Incremental%s%s' % (verb,
                                               granularity)] = ('unverified', message)
             return
-        if len(riter.record_list) == 0:
+        if len(test_records) == 0:
             self.results['Incremental%s%s' % (verb, granularity)] = ('error',
                                                                      'No incremental harvesting (%s granularity) of %s: '
                                                                      'Harvest for reference date %s returned no records.' % (granularity, verb, reference_datestamp))
@@ -579,7 +579,7 @@ class Validator(object):
                 message = ('Expiration date of resumption token could not be checked: '
                            'invalid date format: %s' % expiration_date)
                 self.results['ResumptionTokenExp'] = ('error', message)
-        
+
         # Check completeListSize
         riter = self.RecordIterator(verb=verb, metadataPrefix=metadataPrefix)
         number_of_records = len(riter.record_list)
@@ -604,7 +604,7 @@ class Validator(object):
         self.results['ResumptionTokenList'] = ('ok', message)
         return
 
-        
+
 
     def check_deleting_strategy(self):
         """Report the deleting strategy; recommend persistent or transient"""
