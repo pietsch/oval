@@ -28,7 +28,6 @@ from urllib import urlencode
 from functools import wraps
 
 from ordereddict import OrderedDict
-from oval import __version__ as ovalversion
 from lxml import etree
 
 
@@ -57,13 +56,13 @@ def memoize(duration=30, max_length=10):
                 CACHE.popitem(last=False)
             # do we have a response for the request?
             if (key in CACHE and
-                not is_obsolete(CACHE[key], duration)):
+                    not is_obsolete(CACHE[key], duration)):
                 return CACHE[key]['value']
             # new request
             result = function(*args, **kw)
             CACHE[key] = {
-                            'value': result,
-                            'time': time.time()
+                'value': result,
+                'time': time.time()
             }
             return result
         return __memoize
@@ -79,7 +78,7 @@ def normalize_params(params):
     :param params: The HTTP parameters for a request.
     """
     if params.get('resumptionToken') is not None:
-        #metadataPrefix/from/until not allowed if resumptionToken -> remove
+        # metadataPrefix/from/until not allowed if resumptionToken -> remove
         try:
             del params['metadataPrefix']
         except KeyError:
@@ -121,12 +120,12 @@ def fetch_data(base_url, method, params, retries=5, timeout=None):
         request.add_data(data)
     elif method == 'GET':
         request = Request(base_url + data)
-    request.add_header('User-Agent', 'oval/%s' % ovalversion)
+    request.add_header('User-Agent', 'oval')
     for _ in range(retries):
         try:
             response = urllib2.urlopen(request, None, timeout=timeout)
             return response.read()
-        except URLError, e:
+        except URLError as e:
             if hasattr(e, 'reason'):
                 raise
             elif hasattr(e, 'code'):
@@ -242,6 +241,7 @@ def configure_record_iterator(base_url, protocol_version, HTTPmethod, timeout=No
        :param timeout: Optional timeout for the HTTP requests sent to the server.
     """
     class RecordIterator(object):
+
         """Iterator over OAI records/identifiers transparently aggregated via
         OAI-PMH.
 
@@ -253,7 +253,7 @@ def configure_record_iterator(base_url, protocol_version, HTTPmethod, timeout=No
                            included
         """
         def __init__(self, verb, metadataPrefix, _from=None, until=None,
-                    deleted=False):
+                     deleted=False):
             self.base_url = base_url
             self.verb = verb
             self.metadataPrefix = metadataPrefix
@@ -264,7 +264,7 @@ def configure_record_iterator(base_url, protocol_version, HTTPmethod, timeout=No
             self.HTTPmethod = HTTPmethod
             self.timeout = timeout
 
-            #OAI namespace
+            # OAI namespace
             self.oai_namespace = OAI % self.protocol_version
             # record list
             self.record_list = []
@@ -274,14 +274,14 @@ def configure_record_iterator(base_url, protocol_version, HTTPmethod, timeout=No
                 self.element = 'record'
             elif self.verb == 'ListIdentifiers':
                 self.element = 'header'
-            #Configure request method
+            # Configure request method
             self.request_oai = configure_request(
                 self.base_url, self.HTTPmethod, self.timeout)
-            #Fetch the initial portion
+            # Fetch the initial portion
             response = self.request_oai(verb=self.verb,
-                        metadataPrefix=self.metadataPrefix,
-                        _from=self._from, until=self.until,
-                        resumptionToken=self.token)
+                                        metadataPrefix=self.metadataPrefix,
+                                        _from=self._from, until=self.until,
+                                        resumptionToken=self.token)
             self.record_list = self._get_records(response)
             self.token = self._get_resumption_token(response)
 
@@ -316,9 +316,9 @@ def configure_record_iterator(base_url, protocol_version, HTTPmethod, timeout=No
         def _next_batch(self):
             while self.record_list == []:
                 response = self.request_oai(verb=self.verb,
-                            metadataPrefix=self.metadataPrefix,
-                            _from=self._from, until=self.until,
-                            resumptionToken=self.token)
+                                            metadataPrefix=self.metadataPrefix,
+                                            _from=self._from, until=self.until,
+                                            resumptionToken=self.token)
                 self.record_list = self._get_records(response)
                 self.token = self._get_resumption_token(response)
                 if self.record_list == [] and self.token is None:

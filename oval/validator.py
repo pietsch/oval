@@ -24,7 +24,7 @@ from lxml.etree import DocumentInvalid, XMLSchemaParseError
 
 from harvester import configure_record_iterator, configure_request, \
     get_protocol_version, check_HTTP_methods, \
-    get_repository_information, get_granularity, fetch_data
+    get_repository_information, get_granularity
 
 from data import ISO_639_3_CODES, ISO_639_2B_CODES
 from data import ISO_639_2T_CODES, ISO_639_1_CODES
