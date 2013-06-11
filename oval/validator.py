@@ -22,12 +22,13 @@ from lxml import etree
 from lxml.etree import XMLSyntaxError
 from lxml.etree import DocumentInvalid, XMLSchemaParseError
 
-from oval.harvester import configure_record_iterator, configure_request, \
+from harvester import configure_record_iterator, configure_request, \
     get_protocol_version, check_HTTP_methods, \
     get_repository_information, get_granularity, fetch_data
 
-from oval import ISO_639_3_CODES, ISO_639_2B_CODES
-from oval import ISO_639_2T_CODES, ISO_639_1_CODES
+from data import ISO_639_3_CODES, ISO_639_2B_CODES
+from data import ISO_639_2T_CODES, ISO_639_1_CODES
+from functools import reduce
 
 OAI_NAMESPACE = "http://www.openarchives.org/OAI/%s/"
 
@@ -113,6 +114,7 @@ def draw_sample(iterator, size):
 
 
 class Validator(object):
+
     """OAI-PMH Validator
 
     This object is the core of OVAL and serves as its central
@@ -142,7 +144,7 @@ class Validator(object):
         self.timeout = timeout
         self.results = {}
 
-        #HTTP-Method
+        # HTTP-Method
         supported_methods = check_HTTP_methods(self.base_url)
         if len(supported_methods) == 2:
             message = 'Server supports both GET and POST requests.'
@@ -219,7 +221,7 @@ class Validator(object):
         """
         try:
             response = urlopen(self.base_url)
-        except Exception, exc:
+        except Exception as exc:
             message = "Could not compare basic URLs: %s" % unicode(exc)
             self.results['BaseURLMatch'] = ('unverified', message)
             return
@@ -242,12 +244,12 @@ class Validator(object):
                 tree = self.request_oai(
                     verb=verb, metadataPrefix=metadataPrefix,
                     identifier=identifier)
-        except XMLSyntaxError, exc:
+        except XMLSyntaxError as exc:
             message = '%s response is not well-formed: %s' % (
                 verb, unicode(exc))
             self.results['%sXML' % verb] = ('error', message)
             return
-        except Exception, exc:
+        except Exception as exc:
             message = 'XML response of %s could not be validated: %s' % (verb,
                                                                          unicode(exc))
             self.results['%sXML' % verb] = ('unverified', message)
@@ -260,7 +262,8 @@ class Validator(object):
             for s in set(schema_locs):
                 ns_locs_raw = s.split()
                 try:
-                    ns_locs = [(ns_locs_raw[i], ns_locs_raw[i + 1]) for i in range(0, len(ns_locs_raw), 2)]
+                    ns_locs = [(ns_locs_raw[i], ns_locs_raw[
+                                i + 1]) for i in range(0, len(ns_locs_raw), 2)]
                 except IndexError:
                     ns_locs = []
                 for (ns, loc) in ns_locs:
@@ -272,7 +275,7 @@ class Validator(object):
             schema.assertValid(tree)
             self.results['%sXML' % verb] = (
                 'ok', '%s response well-formed and valid.' % verb)
-        except (DocumentInvalid, XMLSchemaParseError), exc:
+        except (DocumentInvalid, XMLSchemaParseError) as exc:
             message = "%s response well-formed but invalid: %s" % (
                 verb, unicode(exc))
             self.results['%sXML' % verb] = ('error', message)
@@ -290,7 +293,7 @@ class Validator(object):
         """
         try:
             riter = self.RecordIterator(verb, metadataPrefix, deleted=True)
-        except Exception, exc:
+        except Exception as exc:
             message = "%s batch size could not be checked: %s" % (
                 verb, unicode(exc))
             self.results['%sBatch' % verb] = ('unverified', message)
@@ -331,13 +334,15 @@ class Validator(object):
         try:
             riter = self.RecordIterator(verb, metadataPrefix)
             records = draw_sample(riter, sample_size)
-        except Exception, exc:
-            message = "Incremental harvesting (%s granularity) of %s could not be checked: %s" % (granularity, verb, unicode(exc))
+        except Exception as exc:
+            message = "Incremental harvesting (%s granularity) of %s could not be checked: %s" % (
+                granularity, verb, unicode(exc))
             self.results['Incremental%s%s' % (verb,
                                               granularity)] = ('unverified', message)
             return
         if len(records) == 0:
-            message = "Incremental harvesting (%s granularity) of %s could not be checked: No records." % (granularity, verb)
+            message = "Incremental harvesting (%s granularity) of %s could not be checked: No records." % (
+                granularity, verb)
             self.results['Incremental%s%s' % (verb,
                                               granularity)] = ('unverified', message)
             return
@@ -345,7 +350,8 @@ class Validator(object):
         reference_datestamp_elem = reference_record.find(
             './/' + self.oai + 'datestamp')
         if reference_datestamp_elem is None:
-            message = "Incremental harvesting (%s granularity) of %s could not be checked: No datestamp." % (granularity, verb)
+            message = "Incremental harvesting (%s granularity) of %s could not be checked: No datestamp." % (
+                granularity, verb)
             self.results['Incremental%s%s' % (verb,
                                               granularity)] = ('unverified', message)
             return
@@ -364,8 +370,9 @@ class Validator(object):
                                         _from=reference_datestamp,
                                         until=reference_datestamp)
             test_records = draw_sample(riter, sample_size)
-        except Exception, exc:
-            message = "Incremental harvesting (%s granularity) of %s could not be checked: %s" % (granularity, verb, unicode(exc))
+        except Exception as exc:
+            message = "Incremental harvesting (%s granularity) of %s could not be checked: %s" % (
+                granularity, verb, unicode(exc))
             self.results['Incremental%s%s' % (verb,
                                               granularity)] = ('unverified', message)
             return
@@ -388,13 +395,15 @@ class Validator(object):
                     test_datestamp = test_datestamp[:10]
                 test_date = dateparser.parse(test_datestamp)
                 if test_date != reference_date:
-                    self.results['Incremental%s%s' % (verb, granularity)] = ('error',
-                                                                             'No incremental (%s granularity) harvesting of %s. '
-                                                                             'Harvest for reference date %s returned record with date %s.' % (granularity, verb,
-                                                                                                                                              reference_datestamp, test_datestamp))
+                    self.results[
+                        'Incremental%s%s' % (verb, granularity)] = ('error',
+                                                                    'No incremental (%s granularity) harvesting of %s. '
+                                                                    'Harvest for reference date %s returned record with date %s.' % (granularity, verb,
+                                                                                                                                     reference_datestamp, test_datestamp))
                     return
-        except Exception, exc:
-            message = "Incremental harvesting (%s granularity) of %s could not be checked: %s" % (granularity, verb, unicode(exc))
+        except Exception as exc:
+            message = "Incremental harvesting (%s granularity) of %s could not be checked: %s" % (
+                granularity, verb, unicode(exc))
             self.results['Incremental%s%s' % (verb,
                                               granularity)] = ('unverified', message)
             return
@@ -411,7 +420,7 @@ class Validator(object):
             riter = self.RecordIterator(verb='ListRecords',
                                         metadataPrefix='oai_dc', deleted=False)
             records = draw_sample(riter, sample_size)
-        except Exception, exc:
+        except Exception as exc:
             message = 'Minimal DC elements could not be checked: %s' % unicode(
                 exc)
             self.results['MinimalDC'] = ('unverified', message)
@@ -447,8 +456,9 @@ class Validator(object):
             riter = self.RecordIterator(verb='ListRecords',
                                         metadataPrefix='oai_dc', deleted=False)
             records = draw_sample(riter, sample_size)
-        except Exception, exc:
-            message = 'dc:date ISO 8601 conformance could not be checked: %s' % unicode(exc)
+        except Exception as exc:
+            message = 'dc:date ISO 8601 conformance could not be checked: %s' % unicode(
+                exc)
             self.results['ISO8601'] = ('unverified', message)
             return
         if len(records) == 0:
@@ -483,8 +493,9 @@ class Validator(object):
             riter = self.RecordIterator(
                 verb='ListRecords', metadataPrefix='oai_dc')
             records = draw_sample(riter, sample_size)
-        except Exception, exc:
-            message = 'dc:language conformance to ISO 639 could not be checked: %s' % unicode(exc)
+        except Exception as exc:
+            message = 'dc:language conformance to ISO 639 could not be checked: %s' % unicode(
+                exc)
             self.results['ISO639'] = ('unverified', message)
             return
         if len(records) == 0:
@@ -528,8 +539,9 @@ class Validator(object):
         """
         try:
             tree = self.request_oai(verb=verb, metadataPrefix=metadataPrefix)
-        except Exception, exc:
-            message = 'Resumption requests could not be checked: %s' % unicode(exc)
+        except Exception as exc:
+            message = 'Resumption requests could not be checked: %s' % unicode(
+                exc)
             self.results['ResumptionToken'] = ('unverified', message)
             return
         resumption_token = tree.find('.//' + self.oai + 'resumptionToken')
@@ -552,7 +564,7 @@ class Validator(object):
             else:
                 message = 'Resumption requests work'
                 self.results['ResumptionToken'] = ('ok', message)
-        except Exception, exc:
+        except Exception as exc:
             message = 'Error during resumption request: %s' % unicode(exc)
             self.results['ResumptionToken'] = ('error', message)
         # Check expirationDate
@@ -570,8 +582,9 @@ class Validator(object):
                 delta_hours = delta.days * 24
                 if delta_hours < 23:
                     message = ('Resumption token should last at least 23 hours. '
-                           'This one lasts: %d hour(s).' % delta_hours)
-                    self.results['ResumptionTokenExp'] = ('recommendation', message)
+                               'This one lasts: %d hour(s).' % delta_hours)
+                    self.results['ResumptionTokenExp'] = (
+                        'recommendation', message)
                 else:
                     message = 'Resumption token lasts %d hours.' % delta_hours
                     self.results['ResumptionTokenExp'] = ('ok', message)
@@ -591,7 +604,7 @@ class Validator(object):
             return
         try:
             list_size = int(list_size)
-        except ValueError, exc:
+        except ValueError as exc:
             message = 'Invalid format of completeListSize: %s' % exc
             self.results['ResumptionTokenList'] = ('error', message)
             return
@@ -604,8 +617,6 @@ class Validator(object):
         self.results['ResumptionTokenList'] = ('ok', message)
         return
 
-
-
     def check_deleting_strategy(self):
         """Report the deleting strategy; recommend persistent or transient"""
         try:
@@ -616,7 +627,7 @@ class Validator(object):
             message = "Deleting strategy could not be checked: deletedRecord element not found."
             self.results['DeletingStrategy'] = ('unverified', message)
             return
-        except Exception, exc:
+        except Exception as exc:
             message = "Deleting strategy could not be checked: %s" % unicode(
                 exc)
             self.results['DeletingStrategy'] = ('unverified', message)
@@ -642,7 +653,7 @@ class Validator(object):
             riter = self.RecordIterator(
                 verb='ListRecords', metadataPrefix='oai_dc')
             records = draw_sample(riter, sample_size)
-        except Exception, exc:
+        except Exception as exc:
             message = "Could not check URL in dc:identifier: %s" % unicode(exc)
             self.results['DCIdentifierURL'] = ('unverified', message)
             return

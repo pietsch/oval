@@ -1,0 +1,45 @@
+
+.alert {
+    font-size: 15px;
+    margin-bottom: 10px;
+}
+
+
+.alert-recommendation {
+    /*background-color: #F5E14E;*/
+}
+
+.alert-warning {
+  background-color: #FFCE6E;
+  border-color: #f89406;
+  color: #B36B04;
+}
+
+.alert-unverified {
+  background-color: #F5F5F5;
+  border-color: #DADADA;
+  color: #959595;
+}
+
+
+
+.footer {
+    border-top: 1px solid #eeeeee;
+    margin-bottom:  1em;
+}
+
+.nav-tabs .disabled > a, .nav-tabs .disabled > a:hover {
+  color: #bfbfbf;
+  background-color: #ffffff;
+  border: 1px solid transparent;
+  border-bottom-color: #ddd;
+  cursor: default;
+}
+
+.bottom {
+    margin-bottom: 1em;
+}
+
+h2 {
+    border-bottom: 1px solid #eeeeee;
+}

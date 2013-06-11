@@ -1,0 +1,44 @@
+{% macro render_results(repository_name, admin_email, results) %}
+<h2>Valdiation Results</h2>
+<h3>Repository Information</h3>
+<dl>
+    <dt>Name:
+    <dd>{{ repository_name }}
+    <dt>Admin:
+        <dd>{{ admin_email }}
+</dl>
+            {% for category in results %}
+                <h3>{{ category }}</h3>
+                {% for level, message in results[category] %}
+                    {% if level == 'ok' %}
+                        {% set level = 'success'%}
+                        {% set icon = 'ok'%}
+                    {% elif level == 'info' %}
+                        {% set icon = 'info-sign'%}
+                    {% elif level == 'recommendation' %}
+                        {% set icon = 'exclamation-sign'%}
+                    {% elif level == 'warning' %}
+                        {% set icon = 'warning-sign'%}
+                    {% elif level == 'error' %}
+                        {% set icon = 'remove'%}
+                    {% elif level == 'unverified' %}
+                        {% set icon = 'question-sign'%}
+                    {% endif %}
+
+                    {% autoescape false %}
+                    <div class="alert alert-{{ level }}"><i class="icon-{{ icon }}"></i> <strong>{{ level|upper }}:</strong> {{ message }}</div>
+                    {% endautoescape %}
+                {% endfor %}
+            {% endfor %}
+<div>
+    <hr/>
+    <h3>Explanation of message categories:</h3>
+    <ul>
+        <li> INFO: Potentially interesting information
+        <li> RECOMMENDATION: Deprecated protocol feature or content-related issue
+        <li> WARNING: Protocol violation or malformed content data
+        <li> ERROR: Serious protocol violation that will affect the harvesting process
+        <li> UNVERIFIED: Feature could not be checked for some reason
+    </ul>
+</div>
+{% endmacro %}

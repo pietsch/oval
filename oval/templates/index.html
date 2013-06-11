@@ -1,0 +1,72 @@
+{% extends "layout.html" %}
+{% block body %}
+    {% if error %}<p class=error>{{ error }}{% endif %}
+    
+    <!-- Nav-Tabs -->
+<div class="tabbable"> 
+  <div class="row">
+  <ul class="nav nav-tabs span9">
+    <li class="active"><a href="#valformtab" data-toggle="tab">Validate Repository</a></li>
+    <li><a href="#about" data-toggle="tab">About</a></li>
+    <li><a href="#related" data-toggle="tab">Related Projects</a></li>
+  </ul>
+  </div>
+  <div class="tab-content">
+    <div class="tab-pane fade active in" id="valformtab">
+      <div class="row">
+      <div class="well well-small span9">
+      <form id="valform" action="" method="post" class="form-horizontal">
+            <div class="input-append">
+                <input class="input-xlarge" value="{{ previous_url }}" name="basic_url" id="appendedInputButton" size="16" type="text" placeholder="URL to OAI-PMH endpoint" autofocus>
+                <button class="btn" type="submit">Validate!</button>
+            </div>
+        </form>
+        <span id="loader" style="display:none"><img src="{{ url_for('static', filename='img/ajaxloader.gif') }}" alt=""> Validating ...</span>
+      </div>
+      </div>
+    <div class="row">
+      <div class="span8 fade in" id="results">
+          {{ results }}
+      </div>
+    </div>
+    </div>
+    <div class="tab-pane fade in" id="about">
+      <div class="row">
+        <div class="span8">
+      <p>The BASE <a target="blank" href="http://www.openarchives.org/OAI/openarchivesprotocol.html">OAI-PMH</a>
+        Validator is a service provided by <a href="http://base-search.net"><em>Bielefeld Academic Search Engine</em> (BASE)</a>.
+        It has been designed to help repository managers to easily verify if their repository is 
+        compliant with the BASE requirements.
+    
+        <p>To validate your repository, enter its OAI-PMH endpoint URL and press "Validate!".
+    
+        <p>Note: We use caching to minimize the number of requests to the
+        repository server. However, depending on the responsiveness of the 
+        server, the verification process may take some time. 
+        Also, each request currently times out after 20 seconds.
+
+        <p>The source code of the back end application is available on GitHub:
+        <p><a class="btn" href="http://github.com/mloesch/oval"> <i class="icon-github"></i> Get the Code!</a>
+
+        </div>
+      </div>
+    </div>
+    <div class="tab-pane fade in" id="related">
+      <div class="row">
+        <div class="span8">
+        <strong>Related projects:</strong>
+          <ul>
+              <li><a href="http://validator.oaipmh.com/">OAI-PMH Validator</a> 
+              <li><a href="http://oanet.cms.hu-berlin.de/validator">DINI Validator</a>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+
+
+  </div>
+</div>
+
+
+{% endblock %}
