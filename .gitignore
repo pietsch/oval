@@ -4,3 +4,4 @@ oval.egg-info/*
 build/*
 dist/*
 doc/build/*
+oval.tar.gz
