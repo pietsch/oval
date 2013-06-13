@@ -8,16 +8,11 @@ this_dir, this_filename = os.path.split(__file__)
 sys.path.insert(0, os.path.abspath(this_dir))
 
 from urllib2 import HTTPError, URLError
-from time import time
-from flask import Flask, request, redirect, session, g, url_for, \
-    abort, render_template, flash, get_template_attribute
-from contextlib import closing
+from flask import Flask, request, render_template, get_template_attribute
 
 from lxml.etree import XMLSyntaxError
 from ordereddict import OrderedDict
 from lepl.apps.rfc3696 import HttpUrl
-
-import logging
 
 from validator import Validator
 
@@ -48,20 +43,6 @@ RESULT_CATEGORIES = OrderedDict(
 app = Flask(__name__)
 app.config.from_object(__name__)
 app.config['DEBUG'] = True
-
-# Logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-formatter = logging.Formatter("%(asctime)s %(levelname)s: %(message)s",
-                              "%d.%m.%Y %H:%M:%S")
-
-
-handler = logging.StreamHandler()
-# handler = logging.FileHandler('/var/log/oval/oval.log')
-handler.setLevel(logging.INFO)
-handler.setFormatter(formatter)
-logger.addHandler(handler)
 
 url_is_valid = HttpUrl()
 
