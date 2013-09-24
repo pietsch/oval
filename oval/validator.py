@@ -482,7 +482,7 @@ class Validator(object):
                         DC_DATE_DAY.match(date) or
                         DC_DATE_FULL.match(date)):
                     wrong_date.append(record)
-        self.results['ISO8601'] = ('ok', 'dc:dates conform to ISO 8601.')
+        self.results['ISO8601'] = ('ok', 'dc:date conforms to ISO 8601.')
 
     def dc_language_ISO(self, sample_size=50):
         """Check if dc:language conforms to ISO 639-3/-2B/-2T/-1.
