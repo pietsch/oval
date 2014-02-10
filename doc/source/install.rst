@@ -7,19 +7,20 @@ Requirements
 
 * lxml
 * ordereddict
-* argparse
 
-Setup
------
-
-Download the current source from GitHub at 
-https://github.com/syslogd/oval/tarball/master.
-Unpack, cd into resulting directory and run
+On a Debian-based system, you could satisfy the dependencies by doing this:
 
 .. code-block:: sh
+    sudo apt-get install python-lxml
+    sudo pip install ordereddict
 
-    python setup.py build
-    sudo python setup.py install
+
+Download
+--------
+
+Download the current source from GitHub at 
+https://github.com/pietsch/oval/tarball/master.
+
 
 Tutorial
 --------
@@ -39,7 +40,7 @@ We create a :class:`~oval.validator.Validator` object with that URL:
 
 .. code-block:: python
     
-    >>> elis_validator = Validator('http://eprints.rclis.org/dspace-oai/request')
+    >>> pub_validator = Validator('http://pub.uni-bielefeld.de/oai')
 
 Our freshly created :class:`~oval.validator.Validator` object instantly connects the 
 OAI-PMH interface and gets some basic information about the repository, for example its 
@@ -47,10 +48,10 @@ human-readable name and the admin's email address:
 
 .. code-block:: python
 
-    >>> elis_validator.repository_name
-    u'E-LIS. E-prints in Library and Information Science'
-    >>> elis_validator.admin_email
-    u'elis@cilea.it'
+    >>> pub_validator.repository_name
+    u'PUB - Publications at Bielefeld University'
+    >>> pub_validator.admin_email
+    u'pub-oai-admin+this_is_a_fake_address@uni-bielefeld.de'
 
 It gets this information from the repository's ``Identify`` response.
 
@@ -59,7 +60,7 @@ These and all further results are stored in the attribute :attr:`results`:
 
 .. code-block:: python
      
-     >>> elis_validator.results
+     >>> pub_validator.results
      {'HTTPMethod': ('ok', 'Server supports both GET and POST requests.'),
       'ProtocolVersion': ('ok', 'OAI-PMH version is 2.0')}
 
@@ -85,14 +86,14 @@ output for the ``ListRecords`` verb using the
 
 .. code-block:: python
     
-    >>> elis_validator.validate_XML('ListRecords')
+    >>> pub_validator.validate_XML('ListRecords')
 
 In general, the validation methods do not produce any return values, but
 add their results to the :attr:`results` dictionary instead:
 
 .. code-block:: python
 
-    >>> elis_validator.results
+    >>> pub_validator.results
     {'HTTPMethod': ('ok', 'Server supports both GET and POST requests.'),
      'ListRecordsXML': ('ok', 'ListRecords response well-formed and valid.'),
      'ProtocolVersion': ('ok', 'OAI-PMH version is 2.0')}
@@ -102,14 +103,26 @@ verb. Note that you can also use this method for other OAI-PMH verbs.
 
 .. code-block:: python
     
-    >>> elis_validator.validate_XML('Identify')
-    >>> elis_validator.results
+    >>> pub_validator.validate_XML('Identify')
+    >>> pub_validator.results
     {'HTTPMethod': ('ok', 'Server supports both GET and POST requests.'),
      'IdentifyXML': ('ok', 'Identify response well-formed and valid.'),
      'ListRecordsXML': ('ok', 'ListRecords response well-formed and valid.'),
      'ProtocolVersion': ('ok', 'OAI-PMH version is 2.0')}
 
-By now you have some basic knowledge about how to use the 
-:class:`~oval.validator.Validator` object and already performed some validation
-steps. You should now proceed to its :class:`API documentation <oval.validator.Validator>` and get an overview of 
-all validation methods available.
+Let's check a more advanced feature, incremental harvesting. The
+second parameter must be either ``day`` or ``full``:
+
+.. code-block:: python
+    
+    >>> pub_validator.incremental_harvesting('ListRecords', 'day')
+    >>> pub_validator.results
+    {'HTTPMethod': ('ok', 'Server supports both GET and POST requests.'),
+     'IdentifyXML': ('ok', 'Identify response well-formed and valid.'),
+     'IncrementalListRecordsday': ('ok',
+      'Incremental harvesting (day granularity) of ListRecords works.'),
+     'IncrementalListRecordsfull': ('ok',
+      'Incremental harvesting (full granularity) of ListRecords works.'),
+     'ListRecordsXML': ('ok', 'ListRecords response well-formed and valid.'),
+     'ProtocolVersion': ('ok', 'OAI-PMH version is 2.0')}
+

@@ -121,13 +121,13 @@ class Validator(object):
     interface. It is instantiated per repository with the URL to
     the OAI-PMH endpoint::
 
-        validator = Validator('http://eprints.rclis.org/dspace-oai/request')
+        pub_validator = Validator('http://pub.uni-bielefeld.de/oai')
 
     Note that the validation methods do not return anything but store
     their results in the :attr:`results` attribute::
 
-        elis_validator.validate_XML('ListRecords')
-        elis_validator.results
+        pub_validator.validate_XML('ListRecords')
+        pub_validator.results
         {'HTTPMethod': ('ok', 'Server supports both GET and POST requests.'),
         'ListRecordsXML': ('ok', 'ListRecords response well-formed and valid.'),
         'ProtocolVersion': ('ok', 'OAI-PMH version is 2.0')}
@@ -379,7 +379,7 @@ class Validator(object):
         if len(test_records) == 0:
             self.results['Incremental%s%s' % (verb, granularity)] = ('error',
                                                                      'No incremental harvesting (%s granularity) of %s: '
-                                                                     'Harvest for reference date %s returned no records.' % (granularity, verb, reference_datestamp))
+                                                                     'Harvest for reference date %s returned no records. Please make sure that the from and until parameters are evaluated.' % (granularity, verb, reference_datestamp))
             return
         try:
             for record in test_records:
