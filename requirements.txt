@@ -1,4 +1,4 @@
-lxml
+lxml>=3.3.1
 ordereddict
 dateutil
 lepl
