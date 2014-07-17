@@ -92,8 +92,10 @@ def normalize_base_url(url):
     url = url.strip()
     if '?verb=' in url:
         url = url[:url.index('verb=')]
-    elif url.endswith('?') or '?' in url:
+    elif url.endswith('?'):
         pass
+    elif '?' in url and not url.endswith('?'):
+        url = url + '&'    
     else:
         url = url + '?'
     return url
