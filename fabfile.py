@@ -5,7 +5,7 @@ from fabric.api import *
 #: The user to use for the remote commands
 user = 'root'
 #: The machine(s) where the application will be deployed
-hosts = ['129.70.12.31']
+hosts = ['129.70.43.31']
 #: The remote installation directory
 install_dir = '/var/www/wsgi-scripts/'
 
@@ -20,4 +20,4 @@ def deploy():
         run('cp -r /tmp/oval %s'  % install_dir)
     run('rm -rf /tmp/oval /tmp/oval.tar.gz')
     local('rm oval.tar.gz')
-    run('apache2ctl graceful')
+    run('service apache2 restart')
