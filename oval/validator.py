@@ -37,7 +37,7 @@ DC = '{%s}' % DC_NAMESPACE
 
 XS = '{http://www.w3.org/2001/XMLSchema}'
 
-LOOKUP_URL = "http://129.70.12.31/lookup?"
+LOOKUP_URL = "http://129.70.43.31/lookup?"
 
 # Minimal Dublin Core elements according to DRIVER and DINI
 MINIMAL_DC_SET = set([
@@ -772,7 +772,7 @@ def main():
     val.check_deleting_strategy()
     val.check_double_utf8()
     val.check_handle()
-    val.indexed_in_BASE()
+    #val.indexed_in_BASE()
 
     pprint(val.results)
 
